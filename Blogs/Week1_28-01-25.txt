@@ -1,0 +1,14 @@
+Initial setup:
+-Choosing the correct IDE: Pycharm
+    ->Seamless git integration for unloading files as the project progresses.
+    ->Virtual Environment to simplify dependency handling when using many libraries.
+    ->GUI designer aid for making image upload/previews
+-Choosing the right UI framework: PyQt
+    ->High variety of widgets(buttons, menus etc) for customizability
+
+^^Both resource heavy but overall better than things like Spyder and Tkinter
+
+Created User Requirement Diagrams: User_Diagram.docx
+Created System Architecture Model: Sys_Arc.docx
+
+Created a Skeleton UI draft: Dev/Ui_Draft
