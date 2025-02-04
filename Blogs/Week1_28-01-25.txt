@@ -8,7 +8,5 @@ Initial setup:
 
 ^^Both resource heavy but overall better than things like Spyder and Tkinter
 
-Created User Requirement Diagrams: User_Diagram.docx
-Created System Architecture Model: Sys_Arc.docx
-
 Created a Skeleton UI draft: Dev/Ui_Draft
+Completed first draft of project outline Documents/PorjectOutlineDft
