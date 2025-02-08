@@ -127,7 +127,61 @@ class Screen3(QMainWindow):
         print("Edge-detected image successfully loaded into QLabel.")
 
     def cannyTrackbars(self):
-        print("placeholder")
+        if not hasattr(self.screen1, "global_image") or not self.screen1.global_image:
+            print("Error: No image loaded.")
+            return
+
+        image_path = self.screen1.global_image
+        print(f"Processing image: {image_path}")
+
+        # Read image and preprocess
+        image = cv2.imread(image_path)
+        if image is None:
+            print("Error: Unable to read the image.")
+            return
+
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        blurred = cv2.GaussianBlur(gray, (5, 5), 1.4)
+
+        # Ensure sliders exist
+        if not hasattr(self, "lowThresh") or not hasattr(self, "highThresh"):
+            print("Error: Threshold sliders not found.")
+            return
+
+        # Enable sliders
+        self.lowThresh.setEnabled(True)
+        self.highThresh.setEnabled(True)
+
+        # Connect slider events to update function
+        self.lowThresh.valueChanged.connect(lambda: self.update_edges(blurred))
+        self.highThresh.valueChanged.connect(lambda: self.update_edges(blurred))
+
+        # Call update once to show initial edges
+        self.update_edges(blurred)
+
+    def update_edges(self, blurred):
+        low = self.lowThresh.value()
+        high = self.highThresh.value()
+
+        edges = cv2.Canny(blurred, low, high)
+        edge_image_path = "edges_output.png"
+
+        success = cv2.imwrite(edge_image_path, edges)
+        if not success:
+            print("Error: Failed to save the edge-detected image.")
+            return
+
+        print(f"Edge-detected image saved as: {edge_image_path}")
+
+        # Load and display the image
+        pixmap = QPixmap(edge_image_path)
+        if pixmap.isNull():
+            print("Error: Failed to load the saved image.")
+            return
+
+        pixmap = pixmap.scaled(300, 200, Qt.AspectRatioMode.KeepAspectRatio)
+        self.imageLabel.setPixmap(pixmap)
+        self.imageLabel.setScaledContents(True)
 
 class Screen2(QWidget):
     def __init__(self, stacked_widget):
