@@ -1,5 +1,5 @@
 import sys
-
+import pyembroidery as pe
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QStackedWidget, QLabel, QMainWindow, \
@@ -106,14 +106,42 @@ class Screen3(QMainWindow):
             return
 
         edges = cv2.Canny(image, 50, 150)
+        contours, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+
+        # Create a blank canvas for drawing contours
+        contour_image = np.zeros_like(image)
+        cv2.drawContours(contour_image, contours, -1, (255, 255, 255), 1)
+
         edge_image_path = "edges_output.png"
-        success = cv2.imwrite(edge_image_path, edges)
+        success = cv2.imwrite(edge_image_path, contour_image)
 
         if not success:
             print("Error: Failed to save the edge-detected image.")
             return
 
         print(f"Edge-detected image saved as: {edge_image_path}")
+
+        outfile = "emb"
+        smallthresh = 6
+
+        p1 = pe.EmbPattern()
+        print(f"THere are {len(contours)} contours found")
+        for c in contours:
+            print(f"This contour is {len(c)} points long")
+            if len(c) < smallthresh:
+                print("Really short contour, probably noise")
+
+            else:
+                print("Adding the contour of an object to our pattern")
+                stitches = [];
+                for pt in c:
+                    stitches.append([pt[0][0], pt[0][1]])
+                p1.add_block(stitches, "blue")
+
+        pe.write_dst(p1, f"{outfile}.dst")
+        pe.write_png(p1, f"{outfile}.png")
+
+
 
         pixmap = QPixmap(edge_image_path)
         if pixmap.isNull():
