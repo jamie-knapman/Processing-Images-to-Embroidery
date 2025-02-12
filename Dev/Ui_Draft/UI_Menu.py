@@ -136,7 +136,9 @@ class Screen3(QMainWindow):
                 print("Adding the contour of an object to our pattern")
                 stitches = [];
                 for pt in c:
-                    stitches.append([pt[0][0], pt[0][1]])
+                    x, y = pt[0][0], pt[0][1]
+                    stitches.append((x * scale_factor, y * scale_factor))
+                    #stitches.append([pt[0][0], pt[0][1]])
                 p1.add_block(stitches, "blue")
         pe.write_pes(p1, f"{outfile}.pes")
         pe.write_png(p1, f"{outfile}.png")

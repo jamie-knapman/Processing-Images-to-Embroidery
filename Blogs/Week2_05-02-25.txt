@@ -14,4 +14,5 @@ Write to .pes instead of .dst
 Experiment with Embroidery machine (when fixed)
 Write a section about software engineering techniques (Chapter for final report)
 Gain a proof of concept embroider (any design)
+Research shading of images
 Research some background subtraction for later in project
