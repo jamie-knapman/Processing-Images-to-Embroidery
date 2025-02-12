@@ -1,0 +1,17 @@
+Started the week by revising what i already know about openCV as well as some new concepts for later use in my program
+implemented some edge detection algorithms (canny & contour) in a separate project (FirstCanny.png)
+Added file uploads and said edge detection into the main UI (UploadTest1(-4).png)
+Combined both canny edge detection and contours to produce refined images for embroidery(emb.png) ONLY WORKS FOR EASY IMAGES.
+Final addition this week was adding some pyembroidery functionality to make dst files
+
+Helpful picture of Moe for edge complexity while excluding noise :) (Test.png)
+
+Submitted and got feedback on UI-Draft
+
+For next week:
+Fix sizing issue on image outputs
+Write to .pes instead of .dst
+Experiment with Embroidery machine (when fixed)
+Write a section about software engineering techniques (Chapter for final report)
+Gain a proof of concept embroider (any design)
+Research some background subtraction for later in project

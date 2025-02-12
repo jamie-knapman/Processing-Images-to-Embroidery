@@ -123,6 +123,7 @@ class Screen3(QMainWindow):
 
         outfile = "emb"
         smallthresh = 6
+        scale_factor = 3.0
 
         p1 = pe.EmbPattern()
         print(f"THere are {len(contours)} contours found")
@@ -137,8 +138,7 @@ class Screen3(QMainWindow):
                 for pt in c:
                     stitches.append([pt[0][0], pt[0][1]])
                 p1.add_block(stitches, "blue")
-
-        pe.write_dst(p1, f"{outfile}.dst")
+        pe.write_pes(p1, f"{outfile}.pes")
         pe.write_png(p1, f"{outfile}.png")
 
 
