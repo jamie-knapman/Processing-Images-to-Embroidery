@@ -58,13 +58,10 @@ class Screen1(QMainWindow):
         if file_path:
             self.global_image = file_path
             self.pixmap = QPixmap(file_path)
-            self.pixmap = self.pixmap.scaled(300, 200, Qt.AspectRatioMode.KeepAspectRatio)
             self.imageLabel.setPixmap(self.pixmap)
-            self.imageLabel.setScaledContents(False)
+            self.imageLabel.setScaledContents(True)  # Allow dynamic resizing
             self.NextButton.setEnabled(True)
             print(f"Image loaded: {file_path}")
-
-
 
 
 class Screen3(QMainWindow):
