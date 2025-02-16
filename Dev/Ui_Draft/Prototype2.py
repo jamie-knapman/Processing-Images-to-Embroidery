@@ -112,7 +112,7 @@ class Screen3(QMainWindow):
         contour_image = np.zeros_like(image)
         cv2.drawContours(contour_image, contours, -1, (255, 255, 255), 1)
 
-        edge_image_path = "edges_output.png"
+        edge_image_path = "edges_output1.png"
         success = cv2.imwrite(edge_image_path, contour_image)
 
         if not success:
@@ -121,30 +121,53 @@ class Screen3(QMainWindow):
 
         print(f"Edge-detected image saved as: {edge_image_path}")
 
-        outfile = "emb"
+        outfile = "emb1"
         smallthresh = 6
         scale_factor = 3.0
 
         p1 = pe.EmbPattern()
-        print(f"THere are {len(contours)} contours found")
-        for c in contours:
-            print(f"This contour is {len(c)} points long")
-            if len(c) < smallthresh:
-                print("Really short contour, probably noise")
+        print(f"There are {len(contours)} contours found")
 
+        # Convert contours to a list of (x, y) points
+        contour_paths = []
+        for c in contours:
+            if len(c) < smallthresh:
+                continue  # Ignore very small noise
+
+            stitches = [(pt[0][0] * scale_factor, pt[0][1] * scale_factor) for pt in c]
+            contour_paths.append(stitches)
+
+        # Reorder and connect contours with jump stitches
+        ordered_stitches = []
+        current_pos = (0, 0)
+
+        while contour_paths:
+            # Find the closest contour to the current position
+            next_contour = min(contour_paths,
+                               key=lambda path: np.linalg.norm(np.array(path[0]) - np.array(current_pos)))
+            contour_paths.remove(next_contour)
+
+            if ordered_stitches:
+                # Add a jump stitch to connect to the next contour
+                ordered_stitches.append((next_contour[0][0], next_contour[0][1], "JUMP"))
+
+            ordered_stitches.extend(next_contour)
+            current_pos = next_contour[-1]  # Update current position
+
+        # Add all connected stitches to the pattern
+        for stitch in ordered_stitches:
+            if isinstance(stitch, tuple) and len(stitch) == 3 and stitch[2] == "JUMP":
+                p1.add_stitch_absolute(pe.JUMP, stitch[0], stitch[1])
             else:
-                print("Adding the contour of an object to our pattern")
-                stitches = [];
-                for pt in c:
-                    x, y = pt[0][0], pt[0][1]
-                    stitches.append((x * scale_factor, y * scale_factor))
-                    #stitches.append([pt[0][0], pt[0][1]])
-                p1.add_block(stitches, "blue")
+                p1.add_stitch_absolute(pe.STITCH, stitch[0], stitch[1])
+
+        p1.end()
+
+        # Save to PES format
         pe.write_pes(p1, f"{outfile}.pes")
         pe.write_png(p1, f"{outfile}.png")
 
-
-
+        # Display edge-detected image in GUI
         pixmap = QPixmap(edge_image_path)
         if pixmap.isNull():
             print("Error: Failed to load the saved image.")
