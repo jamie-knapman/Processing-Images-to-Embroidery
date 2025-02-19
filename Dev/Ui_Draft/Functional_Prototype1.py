@@ -22,7 +22,6 @@ class MainWindow(QMainWindow):
         self.setFixedSize(800, 450)
 
 
-        # Find buttons from the UI and connect them
         self.button1 = self.findChild(QPushButton, "createNew")
         self.button2 = self.findChild(QPushButton, "openSaved")
 
@@ -59,7 +58,7 @@ class Screen1(QMainWindow):
             self.global_image = file_path
             self.pixmap = QPixmap(file_path)
             self.imageLabel.setPixmap(self.pixmap)
-            self.imageLabel.setScaledContents(True)  # Allow dynamic resizing
+            self.imageLabel.setScaledContents(True)
             self.NextButton.setEnabled(True)
             print(f"Image loaded: {file_path}")
 
@@ -96,17 +95,17 @@ class Screen3(QMainWindow):
     def get_small_thresh(self):
         """ Retrieves and validates the user's threshold input """
         if not self.smallThreshIn:
-            return 6  # Default if UI element isn't found
+            return 6
 
         text = self.smallThreshIn.toPlainText().strip()
         try:
-            return int(text)  # Convert to integer
+            return int(text)
         except ValueError:
             try:
-                return float(text)  # Convert to float if integer fails
+                return float(text)
             except ValueError:
                 print("Invalid input. Using default threshold (6).")
-                return 6  # Default threshold to prevent errors
+                return 6
 
     def vectorise(self):
         if not hasattr(self.screen1, "global_image") or not self.screen1.global_image:
@@ -124,7 +123,6 @@ class Screen3(QMainWindow):
         edges = cv2.Canny(image, 50, 150)
         contours, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
-        # Create a blank canvas for drawing contours
         contour_image = np.zeros_like(image)
         cv2.drawContours(contour_image, contours, -1, (255, 255, 255), 1)
 
@@ -144,33 +142,28 @@ class Screen3(QMainWindow):
         p1 = pe.EmbPattern()
         print(f"There are {len(contours)} contours found")
 
-        # Convert contours to a list of (x, y) points
         contour_paths = []
         for c in contours:
             if len(c) < smallthresh:
-                continue  # Ignore very small noise
+                continue
 
             stitches = [(pt[0][0] * scale_factor, pt[0][1] * scale_factor) for pt in c]
             contour_paths.append(stitches)
 
-        # Reorder and connect contours with jump stitches
         ordered_stitches = []
         current_pos = (0, 0)
 
         while contour_paths:
-            # Find the closest contour to the current position
             next_contour = min(contour_paths,
                                key=lambda path: np.linalg.norm(np.array(path[0]) - np.array(current_pos)))
             contour_paths.remove(next_contour)
 
             if ordered_stitches:
-                # Add a jump stitch to connect to the next contour
                 ordered_stitches.append((next_contour[0][0], next_contour[0][1], "JUMP"))
 
             ordered_stitches.extend(next_contour)
-            current_pos = next_contour[-1]  # Update current position
+            current_pos = next_contour[-1]
 
-        # Add all connected stitches to the pattern
         for stitch in ordered_stitches:
             if isinstance(stitch, tuple) and len(stitch) == 3 and stitch[2] == "JUMP":
                 p1.add_stitch_absolute(pe.JUMP, stitch[0], stitch[1])
@@ -179,11 +172,9 @@ class Screen3(QMainWindow):
 
         p1.end()
 
-        # Save to PES format
         pe.write_pes(p1, f"{outfile}.pes")
         pe.write_png(p1, f"{outfile}.png")
 
-        # Display edge-detected image in GUI
         pixmap = QPixmap(f"{outfile}.png")
         if pixmap.isNull():
             print("Error: Failed to load the saved image.")
@@ -195,18 +186,6 @@ class Screen3(QMainWindow):
 
         print("Edge-detected image successfully loaded into QLabel.")
 
-
-
-
-
-
-
-
-
-
-
-
-
     def cannyTrackbars(self):
         if not hasattr(self.screen1, "global_image") or not self.screen1.global_image:
             print("Error: No image loaded.")
@@ -215,7 +194,6 @@ class Screen3(QMainWindow):
         image_path = self.screen1.global_image
         print(f"Processing image: {image_path}")
 
-        # Read image and preprocess
         image = cv2.imread(image_path)
         if image is None:
             print("Error: Unable to read the image.")
@@ -224,37 +202,40 @@ class Screen3(QMainWindow):
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         blurred = cv2.GaussianBlur(gray, (5, 5), 1.4)
 
-        # Ensure sliders exist
+
         if not hasattr(self, "lowThresh") or not hasattr(self, "highThresh"):
             print("Error: Threshold sliders not found.")
             return
 
-        # Enable sliders
+
         self.lowThresh.setEnabled(True)
         self.highThresh.setEnabled(True)
 
-        # Connect slider events to update function
         self.lowThresh.valueChanged.connect(lambda: self.update_edges(blurred))
         self.highThresh.valueChanged.connect(lambda: self.update_edges(blurred))
 
-        # Call update once to show initial edges
         self.update_edges(blurred)
 
+        self.submit = self.findChild(QPushButton, "Submit")
+        if self.submit:
+            self.submit.clicked.connect(lambda: self.writeManual())
+        self.submit.setEnabled(True)
+
     def update_edges(self, blurred):
+        """Updates the edges dynamically based on trackbar values."""
         low = self.lowThresh.value()
         high = self.highThresh.value()
 
-        edges = cv2.Canny(blurred, low, high)
+        self.edges = cv2.Canny(blurred, low, high)
         edge_image_path = "edges_output.png"
 
-        success = cv2.imwrite(edge_image_path, edges)
+        success = cv2.imwrite(edge_image_path, self.edges)
         if not success:
             print("Error: Failed to save the edge-detected image.")
             return
 
         print(f"Edge-detected image saved as: {edge_image_path}")
 
-        # Load and display the image
         pixmap = QPixmap(edge_image_path)
         if pixmap.isNull():
             print("Error: Failed to load the saved image.")
@@ -263,6 +244,69 @@ class Screen3(QMainWindow):
         pixmap = pixmap.scaled(300, 200, Qt.AspectRatioMode.KeepAspectRatio)
         self.imageLabel.setPixmap(pixmap)
         self.imageLabel.setScaledContents(True)
+
+    def writeManual(self):
+        """Processes manually detected edges and converts them into embroidery format."""
+        if not hasattr(self, "edges") or self.edges is None:
+            print("Error: No edge data available.")
+            return
+
+        outfile = "emb1"
+        scale_factor = 3.0
+        smallthresh = self.get_small_thresh()
+
+        contours, _ = cv2.findContours(self.edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+
+        contour_image = np.zeros_like(self.edges)
+        cv2.drawContours(contour_image, contours, -1, (255, 255, 255), 1)
+
+        p1 = pe.EmbPattern()
+        print(f"There are {len(contours)} contours found")
+
+        contour_paths = []
+        for c in contours:
+            if len(c) < smallthresh:
+                continue
+
+            stitches = [(pt[0][0] * scale_factor, pt[0][1] * scale_factor) for pt in c]
+            contour_paths.append(stitches)
+
+        ordered_stitches = []
+        current_pos = (0, 0)
+
+        while contour_paths:
+            next_contour = min(contour_paths,
+                               key=lambda path: np.linalg.norm(np.array(path[0]) - np.array(current_pos)))
+            contour_paths.remove(next_contour)
+
+            if ordered_stitches:
+                ordered_stitches.append((next_contour[0][0], next_contour[0][1], "JUMP"))
+
+            ordered_stitches.extend(next_contour)
+            current_pos = next_contour[-1]
+
+        for stitch in ordered_stitches:
+            if isinstance(stitch, tuple) and len(stitch) == 3 and stitch[2] == "JUMP":
+                p1.add_stitch_absolute(pe.JUMP, stitch[0], stitch[1])
+            else:
+                p1.add_stitch_absolute(pe.STITCH, stitch[0], stitch[1])
+
+        p1.end()
+
+        pe.write_pes(p1, f"{outfile}.pes")
+        pe.write_png(p1, f"{outfile}.png")
+
+        pixmap = QPixmap(f"{outfile}.png")
+        if pixmap.isNull():
+            print("Error: Failed to load the saved image.")
+            return
+
+        pixmap = pixmap.scaled(300, 200, Qt.AspectRatioMode.KeepAspectRatio)
+        self.imageLabel.setPixmap(pixmap)
+        self.imageLabel.setScaledContents(True)
+
+        print("Edge-detected image successfully loaded into QLabel.")
+
 
 class Screen2(QWidget):
     def __init__(self, stacked_widget):
