@@ -21,7 +21,6 @@ class MainWindow(QMainWindow):
         uic.loadUi("MainMenu.ui", self)
         self.setFixedSize(800, 450)
 
-
         self.button1 = self.findChild(QPushButton, "createNew")
         self.button2 = self.findChild(QPushButton, "openSaved")
 

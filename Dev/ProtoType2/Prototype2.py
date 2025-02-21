@@ -92,6 +92,9 @@ class Screen3(QMainWindow):
         if not self.smallThreshIn:
             print("Error: smallThreshIn QPlainTextEdit not found.")
 
+        self.nextButton = self.findChild(QPushButton, "next")
+        self.nextButton.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(4))
+
     def get_small_thresh(self):
         """ Retrieves and validates the user's threshold input """
         if not self.smallThreshIn:
@@ -116,11 +119,18 @@ class Screen3(QMainWindow):
         print(f"Processing image: {image_path}")
 
         image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+        v = np.median(image)
+        low = int(max(0, 0.77 * v))
+        high = int(min(255, 0.77 * v))
+
         if image is None:
             print("Error: Unable to read the image.")
             return
 
-        edges = cv2.Canny(image, 50, 150)
+        self.nextButton.setEnabled(True)
+
+        blurred = cv2.GaussianBlur(image, (7,7), 0)
+        edges = cv2.Canny(blurred, low, high)
         contours, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
         contour_image = np.zeros_like(image)
@@ -227,7 +237,7 @@ class Screen3(QMainWindow):
         high = self.highThresh.value()
 
         self.edges = cv2.Canny(blurred, low, high)
-        edge_image_path = "../Ui_Draft/edges_output.png"
+        edge_image_path = "edges_output.png"
 
         success = cv2.imwrite(edge_image_path, self.edges)
         if not success:
@@ -308,6 +318,57 @@ class Screen3(QMainWindow):
         print("Edge-detected image successfully loaded into QLabel.")
 
 
+
+class Screen4(QMainWindow):
+    def __init__(self, stacked_widget, screen3):
+        super().__init__()
+        self.stacked_widget = stacked_widget
+        self.screen3 = screen3
+
+
+        uic.loadUi("Shading.ui", self)
+        self.setFixedSize(800, 450)
+
+        # Find buttons from the UI and connect them
+        self.auto = self.findChild(QPushButton, "Auto")
+        self.auto.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(1))
+
+        self.stitchDistance = self.findChild(QPlainTextEdit, "stitchDistance")
+        if not self.stitchDistance:
+            print("Error: smallThreshIn QPlainTextEdit not found.")
+
+        self.imageLabel = self.findChild(QLabel, "imageLabel")
+        if self.imageLabel:
+            self.imageLabel.setText("No Image Selected")
+
+        outfile = "emb1.png"
+        pixmap = QPixmap(outfile)
+        if pixmap.isNull():
+            print("Error: Failed to load the saved image.")
+            return
+
+        pixmap = pixmap.scaled(300, 200, Qt.AspectRatioMode.KeepAspectRatio)
+        self.imageLabel.setPixmap(pixmap)
+        self.imageLabel.setScaledContents(True)
+
+        print("Image Transferred Successfully")
+
+    def get_stitch_distance(self):
+        """ Retrieves and validates the user's threshold input """
+        if not self.stitchDistance:
+            return 6
+
+        text = self.stitchDistance.toPlainText().strip()
+        try:
+            return int(text)
+        except ValueError:
+            try:
+                return float(text)
+            except ValueError:
+                print("Invalid input. Using default threshold (6).")
+                return 6
+
+
 class Screen2(QWidget):
     def __init__(self, stacked_widget):
         super().__init__()
@@ -327,11 +388,14 @@ main_window = MainWindow(stacked_widget)
 screen1 = Screen1(stacked_widget)
 screen2 = Screen2(stacked_widget)
 screen3 = Screen3(stacked_widget, screen1)
+screen4 = Screen4(stacked_widget, screen3)
 
 stacked_widget.addWidget(main_window)
 stacked_widget.addWidget(screen1)
 stacked_widget.addWidget(screen2)
 stacked_widget.addWidget(screen3)
+stacked_widget.addWidget(screen4)
+
 
 stacked_widget.setCurrentIndex(0)
 stacked_widget.show()
