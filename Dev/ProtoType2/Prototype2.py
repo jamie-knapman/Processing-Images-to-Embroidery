@@ -265,9 +265,10 @@ class Screen3(QMainWindow):
         scale_factor = 3.0
         smallthresh = self.get_small_thresh()
 
-        contours, _ = cv2.findContours(self.edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        dilated = cv2.dilate(self.edges, (3,3), iterations=1)
+        contours, _ = cv2.findContours(dilated, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
 
-        contour_image = np.zeros_like(self.edges)
+        contour_image = np.zeros_like(dilated)
         cv2.drawContours(contour_image, contours, -1, (255, 255, 255), 1)
 
         p1 = pe.EmbPattern()
