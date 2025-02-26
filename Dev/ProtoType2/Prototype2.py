@@ -321,10 +321,10 @@ class Screen3(QMainWindow):
 
 
 class Screen4(QMainWindow):
-    def __init__(self, stacked_widget, screen3):
+    def __init__(self, stacked_widget, screen1):
         super().__init__()
         self.stacked_widget = stacked_widget
-        self.screen3 = screen3
+        self.screen1 = screen1
 
 
         uic.loadUi("Shading.ui", self)
@@ -332,42 +332,85 @@ class Screen4(QMainWindow):
 
         # Find buttons from the UI and connect them
         self.auto = self.findChild(QPushButton, "Auto")
-        self.auto.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(1))
+        if self.auto:
+            self.auto.clicked.connect(self.segmentColours)
 
-        self.stitchDistance = self.findChild(QPlainTextEdit, "stitchDistance")
-        if not self.stitchDistance:
-            print("Error: smallThreshIn QPlainTextEdit not found.")
 
-        self.imageLabel = self.findChild(QLabel, "imageLabel")
-        if self.imageLabel:
-            self.imageLabel.setText("No Image Selected")
-
-        outfile = "emb1.png"
-        pixmap = QPixmap(outfile)
-        if pixmap.isNull():
-            print("Error: Failed to load the saved image.")
+    def segmentColours(self):
+        if not hasattr(self.screen1, "global_image") or not self.screen1.global_image:
+            print("Error: No image loaded.")
             return
 
-        pixmap = pixmap.scaled(300, 200, Qt.AspectRatioMode.KeepAspectRatio)
-        self.imageLabel.setPixmap(pixmap)
-        self.imageLabel.setScaledContents(True)
+        imgPath = self.screen1.global_image  # Access screen1's variable
+        image = cv2.imread(imgPath)
+        if image is None:
+            print("Error: Unable to read the image.")
+            return
 
-        print("Image Transferred Successfully")
+        # Convert to HSV color space
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-    def get_stitch_distance(self):
-        """ Retrieves and validates the user's threshold input """
-        if not self.stitchDistance:
-            return 6
+        # Define broad color ranges (HSV)
+        color_ranges = {
+            "red": [(0, 100, 50), (10, 255, 255)],  # Red (low range)
+            "red2": [(170, 100, 50), (180, 255, 255)],  # Red (high range)
+            "yellow": [(20, 100, 100), (40, 255, 255)],  # Yellow
+            "orange": [(10, 100, 100), (25, 255, 255)],
+            "light_green": [(40, 50, 100), (70, 255, 255)],  # Neon/Lime green
+            "medium_green": [(70, 50, 50), (90, 255, 200)],  # Standard green
+            "dark_green": [(90, 50, 50), (110, 255, 150)],  # Forest green
+            "cyan": [(90, 50, 50), (110, 255, 255)],  # Cyan
+            "teal": [(80, 50, 100), (100, 255, 255)],  # Greenish-blue
+            "light_blue": [(90, 50, 150), (110, 255, 255)],  # Sky blue
+            "medium_blue": [(110, 50, 100), (130, 255, 255)],  # Standard blue
+            "dark_blue": [(130, 50, 50), (150, 255, 200)],  # Navy blue
+            "purple": [(130, 50, 50), (160, 255, 255)],
+            "magenta": [(130, 50, 50), (160, 255, 255)],  # Magenta
+            "black": [(0, 0, 0), (180, 255, 50)],  # Black (low brightness)
+            "gray": [(0, 0, 50), (180, 50, 200)],  # Gray (low saturation)
+            "white": [(0, 0, 200), (180, 55, 255)],  # White (high brightness, low saturation)
+        }
 
-        text = self.stitchDistance.toPlainText().strip()
-        try:
-            return int(text)
-        except ValueError:
-            try:
-                return float(text)
-            except ValueError:
-                print("Invalid input. Using default threshold (6).")
-                return 6
+        # Minimum pixel threshold to consider a color significant
+        PIXEL_THRESHOLD = 500  # Adjust this based on the image size and required sensitivity
+
+        # Extract and save each color component if it has enough pixels
+        for name, (lower, upper) in color_ranges.items():
+            lower = np.array(lower, dtype="uint8")
+            upper = np.array(upper, dtype="uint8")
+
+            # Create mask and apply it
+            mask = cv2.inRange(hsv, lower, upper)
+            result = cv2.bitwise_and(image, image, mask=mask)
+
+            # Count non-zero pixels
+            non_black_pixels = cv2.countNonZero(mask)
+
+            if non_black_pixels >= PIXEL_THRESHOLD:
+                output_path = f"{name}.png"
+                cv2.imwrite(output_path, result)
+                print(f"Saved: {output_path} ({non_black_pixels} pixels)")
+            else:
+                print(f"Skipped: {name} (Only {non_black_pixels} pixels)")
+
+        # Merge both red masks (since red is split in HSV space)
+        red1 = cv2.imread("red.png")
+        red2 = cv2.imread("red2.png")
+
+        if red1 is not None and red2 is not None:
+            merged_red = cv2.addWeighted(red1, 1, red2, 1, 0)
+
+            # Check if the merged red image has enough pixels
+            red_mask = cv2.inRange(hsv, np.array([0, 100, 50]), np.array([10, 255, 255])) + \
+                       cv2.inRange(hsv, np.array([170, 100, 50]), np.array([180, 255, 255]))
+
+            if cv2.countNonZero(red_mask) >= PIXEL_THRESHOLD:
+                cv2.imwrite("red_combined.png", merged_red)
+                print("Saved: red_combined.png")
+            else:
+                print("Skipped: red_combined (Too few pixels)")
+
+        print("Segmentation complete. Check the output images.")
 
 
 class Screen2(QWidget):
@@ -389,7 +432,7 @@ main_window = MainWindow(stacked_widget)
 screen1 = Screen1(stacked_widget)
 screen2 = Screen2(stacked_widget)
 screen3 = Screen3(stacked_widget, screen1)
-screen4 = Screen4(stacked_widget, screen3)
+screen4 = Screen4(stacked_widget, screen1)
 
 stacked_widget.addWidget(main_window)
 stacked_widget.addWidget(screen1)
