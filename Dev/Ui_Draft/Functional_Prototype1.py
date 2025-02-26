@@ -92,7 +92,6 @@ class Screen3(QMainWindow):
             print("Error: smallThreshIn QPlainTextEdit not found.")
 
     def get_small_thresh(self):
-        """ Retrieves and validates the user's threshold input """
         if not self.smallThreshIn:
             return 6
 
@@ -221,7 +220,6 @@ class Screen3(QMainWindow):
         self.submit.setEnabled(True)
 
     def update_edges(self, blurred):
-        """Updates the edges dynamically based on trackbar values."""
         low = self.lowThresh.value()
         high = self.highThresh.value()
 
@@ -245,7 +243,6 @@ class Screen3(QMainWindow):
         self.imageLabel.setScaledContents(True)
 
     def writeManual(self):
-        """Processes manually detected edges and converts them into embroidery format."""
         if not hasattr(self, "edges") or self.edges is None:
             print("Error: No edge data available.")
             return
