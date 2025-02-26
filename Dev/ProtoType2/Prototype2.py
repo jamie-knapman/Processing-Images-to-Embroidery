@@ -3,13 +3,15 @@ import pyembroidery as pe
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QStackedWidget, QLabel, QMainWindow, \
-    QFileDialog, QPlainTextEdit
+    QFileDialog, QPlainTextEdit, QCheckBox
 from PyQt6 import uic
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from skimage.measure import find_contours
 import svgwrite
+
+from Dev.shadingTest.Shading import contours_to_embroidery_with_bridging
 
 
 class MainWindow(QMainWindow):
@@ -332,6 +334,39 @@ class Screen4(QMainWindow):
         if self.auto:
             self.auto.clicked.connect(self.segmentColours)
 
+        self.red1 = self.findChild(QCheckBox, "red1")
+        self.red2 = self.findChild(QCheckBox, "red2")
+        self.yellow = self.findChild(QCheckBox, "yellow")
+        self.orange = self.findChild(QCheckBox, "orange")
+        self.lGreen = self.findChild(QCheckBox, "lGreen")
+        self.mGreen = self.findChild(QCheckBox, "mGreen")
+        self.dGreen = self.findChild(QCheckBox, "dGreen")
+        self.cyan = self.findChild(QCheckBox, "cyan")
+        self.teal = self.findChild(QCheckBox, "teal")
+        self.lBlue = self.findChild(QCheckBox, "lBlue")
+        self.mBlue = self.findChild(QCheckBox, "mBlue")
+        self.dBlue = self.findChild(QCheckBox, "dBlue")
+        self.purple = self.findChild(QCheckBox, "purple")
+        self.magenta = self.findChild(QCheckBox, "magenta")
+        self.black = self.findChild(QCheckBox, "black")
+        self.gray = self.findChild(QCheckBox, "gray")
+        self.white = self.findChild(QCheckBox, "white")
+
+
+        self.segmented_images = {}
+        self.colourBridge = []
+
+        self.reconstruct = self.findChild(QPushButton, "reconstruct")
+        if self.reconstruct:
+            self.reconstruct.clicked.connect(self.reconstructImg)
+
+        self.generate = self.findChild(QPushButton, "generate")
+        if self.generate:
+            self.generate.clicked.connect(self.generateImg)
+
+        self.finalise = self.findChild(QPushButton, "finalise")
+        if self.finalise:
+            self.finalise.clicked.connect(self.reconstructGenImg)
 
     def segmentColours(self):
         if not hasattr(self.screen1, "global_image") or not self.screen1.global_image:
@@ -370,6 +405,7 @@ class Screen4(QMainWindow):
 
         PIXEL_THRESHOLD = 500
 
+        mainColours = []
 
         for name, (lower, upper) in color_ranges.items():
             lower = np.array(lower, dtype="uint8")
@@ -386,14 +422,20 @@ class Screen4(QMainWindow):
                 output_path = f"{name}.png"
                 cv2.imwrite(output_path, result)
                 print(f"Saved: {output_path} ({non_black_pixels} pixels)")
+                mainColours.append(name)
+                self.segmented_images[name] = result
             else:
                 print(f"Skipped: {name} (Only {non_black_pixels} pixels)")
-
 
         red1 = cv2.imread("red.png")
         red2 = cv2.imread("red2.png")
 
+        if red1 is None or red2 is None:
+            print("Error: One or both red images could not be loaded.")
+            return
         if red1 is not None and red2 is not None:
+            if red1.shape != red2.shape:
+                red2 = cv2.resize(red2, (red1.shape[1], red1.shape[0]))
             merged_red = cv2.addWeighted(red1, 1, red2, 1, 0)
 
             red_mask = cv2.inRange(hsv, np.array([0, 100, 50]), np.array([10, 255, 255])) + \
@@ -406,6 +448,153 @@ class Screen4(QMainWindow):
                 print("Skipped: red_combined (Too few pixels)")
 
         print("Segmentation complete. Check the output images.")
+
+        for i in range(len(mainColours)):
+            if mainColours[i] == "red":
+                self.red1.setEnabled(True)
+            if mainColours[i] == "red2":
+                self.red2.setEnabled(True)
+            if mainColours[i] == "yellow":
+                self.yellow.setEnabled(True)
+            if mainColours[i] == "orange":
+                self.orange.setEnabled(True)
+            if mainColours[i] == "light_green":
+                self.lGreen.setEnabled(True)
+            if mainColours[i] == "medium_green":
+                self.mGreen.setEnabled(True)
+            if mainColours[i] == "dark_green":
+                self.dGreen.setEnabled(True)
+            if mainColours[i] == "cyan":
+                self.cyan.setEnabled(True)
+            if mainColours[i] == "teal":
+                self.teal.setEnabled(True)
+            if mainColours[i] == "light_blue":
+                self.lBlue.setEnabled(True)
+            if mainColours[i] == "medium_blue":
+                self.mBlue.setEnabled(True)
+            if mainColours[i] == "dark_blue":
+                self.dBlue.setEnabled(True)
+            if mainColours[i] == "purple":
+                self.purple.setEnabled(True)
+            if mainColours[i] == "magenta":
+                self.magenta.setEnabled(True)
+            if mainColours[i] == "black":
+                self.black.setEnabled(True)
+            if mainColours[i] == "gray":
+                self.gray.setEnabled(True)
+            if mainColours[i] == "white":
+                self.white.setEnabled(True)
+
+
+    def reconstructImg(self):
+        imgPath = self.screen1.global_image
+        original = cv2.imread(imgPath)
+        if original is None:
+            print("Error: Unable to read the original image.")
+            return
+
+        reconstructed = np.zeros_like(original)
+
+        selected_colors = []
+
+        checkboxes = {
+            "red": self.red1, "red2": self.red2, "yellow": self.yellow, "orange": self.orange,
+            "light_green": self.lGreen, "medium_green": self.mGreen, "dark_green": self.dGreen,
+            "cyan": self.cyan, "teal": self.teal, "light_blue": self.lBlue, "medium_blue": self.mBlue,
+            "dark_blue": self.dBlue, "purple": self.purple, "magenta": self.magenta,
+            "black": self.black, "gray": self.gray, "white": self.white,
+        }
+
+        for name, checkbox in checkboxes.items():
+            if checkbox.isChecked():
+                selected_colors.append(name)
+
+        print("Reconstructing with:", selected_colors)
+
+        for name in selected_colors:
+            if name in self.segmented_images:
+                seg_img = self.segmented_images[name]
+
+                if seg_img.shape[:2] != reconstructed.shape[:2]:
+                    seg_img = cv2.resize(seg_img, (reconstructed.shape[1], reconstructed.shape[0]))
+
+                reconstructed = cv2.bitwise_or(reconstructed, seg_img)
+
+        cv2.imwrite("reconstructed.png", reconstructed)
+        print("Reconstructed image saved as reconstructed.png")
+
+
+
+
+
+    def generateImg(self):
+        imgPath = self.screen1.global_image
+        original = cv2.imread(imgPath)
+        if original is None:
+            print("Error: Unable to read the original image.")
+            return
+
+        selected_colors = []
+
+        checkboxes = {
+            "red": self.red1, "red2": self.red2, "yellow": self.yellow, "orange": self.orange,
+            "light_green": self.lGreen, "medium_green": self.mGreen, "dark_green": self.dGreen,
+            "cyan": self.cyan, "teal": self.teal, "light_blue": self.lBlue, "medium_blue": self.mBlue,
+            "dark_blue": self.dBlue, "purple": self.purple, "magenta": self.magenta,
+            "black": self.black, "gray": self.gray, "white": self.white,
+        }
+
+        for name, checkbox in checkboxes.items():
+            if checkbox.isChecked():
+                selected_colors.append(name)
+
+        self.colourBridge = selected_colors
+
+        for name in selected_colors:
+            contours = self.detect_edges(f"{name}.png")
+            if not contours:
+                print(f"Warning: No contours detected for {name}.png")
+                continue
+            pattern = contours_to_embroidery_with_bridging(contours, name, 6)
+            pe.write_pes(pattern, f"{name}Bridge.pes")
+            pe.write_png(pattern, f"{name}Bridge.png")
+
+
+
+    def contours_to_embroidery_with_bridging(self, contours, color, bridge_spacing):
+        pattern = pe.EmbPattern()
+
+        for contour in contours:
+            points = [(int(pt[0][0]), int(pt[0][1])) for pt in contour]  # Convert contour to list of tuples
+            if len(points) > 1:
+                pattern.add_block(points, color)  # Stitch the contour shape
+
+            # Get bounding box of the contour
+            x, y, w, h = cv2.boundingRect(contour)
+
+            # Improved horizontal bridging
+            for row in range(y, y + h, bridge_spacing):
+                inside = []
+                for col in range(x, x + w, 1):  # Scan every pixel for accuracy
+                    if cv2.pointPolygonTest(contour, (col, row), False) >= 0:
+                        inside.append((col, row))
+
+                if len(inside) > 1:
+                    pattern.add_block([inside[0], inside[-1]], color)  # Stitch from first to last valid point
+
+        return pattern
+
+    def detect_edges(self, image_path):
+        image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+        blurred = cv2.GaussianBlur(image, (7, 7), 0)
+        edges = cv2.Canny(blurred, 50, 150)
+        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        return contours
+
+    def reconstructGenImg(self):
+        print("placehold")
+
 
 
 class Screen2(QWidget):
