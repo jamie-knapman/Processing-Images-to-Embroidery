@@ -347,43 +347,42 @@ class Screen4(QMainWindow):
             print("Error: Unable to read the image.")
             return
 
-        # Convert to HSV color space
+
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-        # Define broad color ranges (HSV)
         color_ranges = {
-            "red": [(0, 100, 50), (10, 255, 255)],  # Red (low range)
-            "red2": [(170, 100, 50), (180, 255, 255)],  # Red (high range)
-            "yellow": [(20, 100, 100), (40, 255, 255)],  # Yellow
+            "red": [(0, 100, 50), (10, 255, 255)],
+            "red2": [(170, 100, 50), (180, 255, 255)],
+            "yellow": [(20, 100, 100), (40, 255, 255)],
             "orange": [(10, 100, 100), (25, 255, 255)],
-            "light_green": [(40, 50, 100), (70, 255, 255)],  # Neon/Lime green
-            "medium_green": [(70, 50, 50), (90, 255, 200)],  # Standard green
-            "dark_green": [(90, 50, 50), (110, 255, 150)],  # Forest green
-            "cyan": [(90, 50, 50), (110, 255, 255)],  # Cyan
-            "teal": [(80, 50, 100), (100, 255, 255)],  # Greenish-blue
-            "light_blue": [(90, 50, 150), (110, 255, 255)],  # Sky blue
-            "medium_blue": [(110, 50, 100), (130, 255, 255)],  # Standard blue
-            "dark_blue": [(130, 50, 50), (150, 255, 200)],  # Navy blue
+            "light_green": [(40, 50, 100), (70, 255, 255)],
+            "medium_green": [(70, 50, 50), (90, 255, 200)],
+            "dark_green": [(90, 50, 50), (110, 255, 150)],
+            "cyan": [(90, 50, 50), (110, 255, 255)],
+            "teal": [(80, 50, 100), (100, 255, 255)],
+            "light_blue": [(90, 50, 150), (110, 255, 255)],
+            "medium_blue": [(110, 50, 100), (130, 255, 255)],
+            "dark_blue": [(130, 50, 50), (150, 255, 200)],
             "purple": [(130, 50, 50), (160, 255, 255)],
-            "magenta": [(130, 50, 50), (160, 255, 255)],  # Magenta
-            "black": [(0, 0, 0), (180, 255, 50)],  # Black (low brightness)
-            "gray": [(0, 0, 50), (180, 50, 200)],  # Gray (low saturation)
-            "white": [(0, 0, 200), (180, 55, 255)],  # White (high brightness, low saturation)
+            "magenta": [(130, 50, 50), (160, 255, 255)],
+            "black": [(0, 0, 0), (180, 255, 50)],
+            "gray": [(0, 0, 50), (180, 50, 200)],
+            "white": [(0, 0, 200), (180, 55, 255)],
         }
 
-        # Minimum pixel threshold to consider a color significant
-        PIXEL_THRESHOLD = 500  # Adjust this based on the image size and required sensitivity
 
-        # Extract and save each color component if it has enough pixels
+        PIXEL_THRESHOLD = 500
+
+
         for name, (lower, upper) in color_ranges.items():
             lower = np.array(lower, dtype="uint8")
             upper = np.array(upper, dtype="uint8")
 
-            # Create mask and apply it
+
             mask = cv2.inRange(hsv, lower, upper)
             result = cv2.bitwise_and(image, image, mask=mask)
 
-            # Count non-zero pixels
+
             non_black_pixels = cv2.countNonZero(mask)
 
             if non_black_pixels >= PIXEL_THRESHOLD:
@@ -393,14 +392,13 @@ class Screen4(QMainWindow):
             else:
                 print(f"Skipped: {name} (Only {non_black_pixels} pixels)")
 
-        # Merge both red masks (since red is split in HSV space)
+
         red1 = cv2.imread("red.png")
         red2 = cv2.imread("red2.png")
 
         if red1 is not None and red2 is not None:
             merged_red = cv2.addWeighted(red1, 1, red2, 1, 0)
 
-            # Check if the merged red image has enough pixels
             red_mask = cv2.inRange(hsv, np.array([0, 100, 50]), np.array([10, 255, 255])) + \
                        cv2.inRange(hsv, np.array([170, 100, 50]), np.array([180, 255, 255]))
 
