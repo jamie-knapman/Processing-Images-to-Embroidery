@@ -1,3 +1,4 @@
+import os
 import sys
 import pyembroidery as pe
 from PyQt6.QtCore import Qt
@@ -182,6 +183,7 @@ class Screen3(QMainWindow):
                 p1.add_stitch_absolute(pe.STITCH, stitch[0], stitch[1])
 
         p1.end()
+        print(p1)
 
         pe.write_pes(p1, f"{outfile}.pes")
         pe.write_png(p1, f"{outfile}.png")
@@ -329,7 +331,6 @@ class Screen4(QMainWindow):
         uic.loadUi("Shading.ui", self)
         self.setFixedSize(800, 450)
 
-        # Find buttons from the UI and connect them
         self.auto = self.findChild(QPushButton, "Auto")
         if self.auto:
             self.auto.clicked.connect(self.segmentColours)
@@ -373,7 +374,7 @@ class Screen4(QMainWindow):
             print("Error: No image loaded.")
             return
 
-        imgPath = self.screen1.global_image  # Access screen1's variable
+        imgPath = self.screen1.global_image
         image = cv2.imread(imgPath)
         if image is None:
             print("Error: Unable to read the image.")
@@ -551,46 +552,98 @@ class Screen4(QMainWindow):
         self.colourBridge = selected_colors
 
         for name in selected_colors:
-            contours = self.detect_edges(f"{name}.png")
-            if not contours:
-                print(f"Warning: No contours detected for {name}.png")
+            img_file = f"{name}.png"
+            print(img_file)
+            if not os.path.exists(img_file):
+                print(f"Warning: Image {img_file} not found. Skipping.")
                 continue
-            pattern = contours_to_embroidery_with_bridging(contours, name, 6)
-            pe.write_pes(pattern, f"{name}Bridge.pes")
-            pe.write_png(pattern, f"{name}Bridge.png")
 
+            try:
+                pattern = self.contours_to_embroidery_with_bridging(img_file, 4, 3.0)
+                if pattern is None:
+                    print(f"Warning: No valid pattern for {img_file}. Skipping.")
+                    continue
 
+                pe.write_pes(pattern, f"{name}Bridge.pes")
+                pe.write_png(pattern, f"{name}Bridge.png")
+            except Exception as e:
+                print(f"Critical Error processing {img_file}: {e}")
+                continue
 
-    def contours_to_embroidery_with_bridging(self, contours, color, bridge_spacing):
+    def contours_to_embroidery_with_bridging(self, image_path, bridge_spacing, scale_factor):
+        print(f"Processing {image_path}")
+
+        image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+        if image is None:
+            print("Error: Unable to load image.")
+            return None
+
+        blurred = cv2.GaussianBlur(image, (7, 7), 0)
+        edges = cv2.Canny(blurred, 50, 150)
+
+        contours, hierarchy = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not contours:
+            print("Error: No contours detected.")
+            return None
+        print(f"Contours found: {len(contours)}")
+
         pattern = pe.EmbPattern()
 
         for contour in contours:
-            points = [(int(pt[0][0]), int(pt[0][1])) for pt in contour]  # Convert contour to list of tuples
-            if len(points) > 1:
-                pattern.add_block(points, color)  # Stitch the contour shape
-
-            # Get bounding box of the contour
             x, y, w, h = cv2.boundingRect(contour)
+            print(f"Processing contour at (x={x}, y={y}, w={w}, h={h})")
 
-            # Improved horizontal bridging
+            outline_stitches = [(pt[0][0] * scale_factor, pt[0][1] * scale_factor) for pt in contour]
+            pattern.add_block(outline_stitches)
+
+            previous_end = None
             for row in range(y, y + h, bridge_spacing):
-                inside = []
-                for col in range(x, x + w, 1):  # Scan every pixel for accuracy
-                    if cv2.pointPolygonTest(contour, (col, row), False) >= 0:
-                        inside.append((col, row))
+                scanline_points = []
 
-                if len(inside) > 1:
-                    pattern.add_block([inside[0], inside[-1]], color)  # Stitch from first to last valid point
+                for col in range(x, x + w):
+                    if cv2.pointPolygonTest(contour, (col, row), False) >= 0:
+                        scanline_points.append((col, row))
+
+                segment_start = None
+                for i in range(len(scanline_points) - 1):
+                    if segment_start is None:
+                        segment_start = scanline_points[i]
+
+                    if scanline_points[i + 1][0] - scanline_points[i][0] > 1:
+                        segment_end = scanline_points[i]
+
+
+                        if segment_start and segment_end and segment_start != segment_end:
+                            first_scaled = (segment_start[0] * scale_factor, segment_start[1] * scale_factor)
+                            last_scaled = (segment_end[0] * scale_factor, segment_end[1] * scale_factor)
+
+                            if previous_end:
+                                pattern.add_stitch_absolute(pe.JUMP, previous_end[0], previous_end[1])
+
+                            pattern.add_stitch_absolute(pe.STITCH, first_scaled[0], first_scaled[1])
+                            pattern.add_stitch_absolute(pe.STITCH, last_scaled[0], last_scaled[1])
+
+                            previous_end = last_scaled
+
+                        segment_start = None
+
+                if segment_start:
+                    segment_end = scanline_points[-1]
+                    first_scaled = (segment_start[0] * scale_factor, segment_start[1] * scale_factor)
+                    last_scaled = (segment_end[0] * scale_factor, segment_end[1] * scale_factor)
+
+                    if previous_end:
+                        pattern.add_stitch_absolute(pe.JUMP, previous_end[0], previous_end[1])
+
+                    pattern.add_stitch_absolute(pe.STITCH, first_scaled[0], first_scaled[1])
+                    pattern.add_stitch_absolute(pe.STITCH, last_scaled[0], last_scaled[1])
+
+                    previous_end = last_scaled
+
+        pattern.end()
+        print("Embroidery pattern generated and saved.")
 
         return pattern
-
-    def detect_edges(self, image_path):
-        image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-        blurred = cv2.GaussianBlur(image, (7, 7), 0)
-        edges = cv2.Canny(blurred, 50, 150)
-        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        return contours
 
     def reconstructGenImg(self):
         print("placehold")
