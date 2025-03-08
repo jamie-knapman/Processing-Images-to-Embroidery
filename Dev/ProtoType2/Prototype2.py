@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from skimage.measure import find_contours
 import svgwrite
 
-from Dev.shadingTest.Shading import contours_to_embroidery_with_bridging
+
 
 
 class MainWindow(QMainWindow):
@@ -427,7 +427,7 @@ class Screen4(QMainWindow):
                 self.segmented_images[name] = result
             else:
                 print(f"Skipped: {name} (Only {non_black_pixels} pixels)")
-
+        '''
         red1 = cv2.imread("red.png")
         red2 = cv2.imread("red2.png")
 
@@ -447,6 +447,7 @@ class Screen4(QMainWindow):
                 print("Saved: red_combined.png")
             else:
                 print("Skipped: red_combined (Too few pixels)")
+        '''
 
         print("Segmentation complete. Check the output images.")
 
@@ -559,7 +560,7 @@ class Screen4(QMainWindow):
                 continue
 
             try:
-                pattern = self.contours_to_embroidery_with_bridging(img_file, 4, 3.0)
+                pattern = self.generate_bridging(img_file, 8, 1.0)
                 if pattern is None:
                     print(f"Warning: No valid pattern for {img_file}. Skipping.")
                     continue
@@ -570,7 +571,7 @@ class Screen4(QMainWindow):
                 print(f"Critical Error processing {img_file}: {e}")
                 continue
 
-    def contours_to_embroidery_with_bridging(self, image_path, bridge_spacing, scale_factor):
+    def generate_bridging(self, image_path, bridge_spacing, scale_factor):
         print(f"Processing {image_path}")
 
         image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
