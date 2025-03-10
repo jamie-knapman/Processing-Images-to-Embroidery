@@ -13,7 +13,6 @@ import matplotlib.pyplot as plt
 from skimage.measure import find_contours
 import svgwrite
 
-from Dev.shadingTest.Shading import contours_to_embroidery_with_bridging
 
 
 class MainWindow(QMainWindow):
@@ -134,7 +133,7 @@ class Screen3(QMainWindow):
 
         blurred = cv2.GaussianBlur(image, (7,7), 0)
         edges = cv2.Canny(blurred, low, high)
-        contours, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
         contour_image = np.zeros_like(image)
         cv2.drawContours(contour_image, contours, -1, (255, 255, 255), 1)
@@ -149,7 +148,7 @@ class Screen3(QMainWindow):
         print(f"Edge-detected image saved as: {edge_image_path}")
 
         outfile = "emb1"
-        scale_factor = 3.0
+        scale_factor = 0.5
         smallthresh = self.get_small_thresh()
 
         p1 = pe.EmbPattern()
@@ -428,7 +427,7 @@ class Screen4(QMainWindow):
                 self.segmented_images[name] = result
             else:
                 print(f"Skipped: {name} (Only {non_black_pixels} pixels)")
-
+        '''
         red1 = cv2.imread("red.png")
         red2 = cv2.imread("red2.png")
 
@@ -448,6 +447,7 @@ class Screen4(QMainWindow):
                 print("Saved: red_combined.png")
             else:
                 print("Skipped: red_combined (Too few pixels)")
+        '''
 
         print("Segmentation complete. Check the output images.")
 
@@ -560,7 +560,7 @@ class Screen4(QMainWindow):
                 continue
 
             try:
-                pattern = self.contours_to_embroidery_with_bridging(img_file, 8, 1.0)
+                pattern = self.contours_to_embroidery_with_bridging(img_file, 8, 0.5)
                 if pattern is None:
                     print(f"Warning: No valid pattern for {img_file}. Skipping.")
                     continue
