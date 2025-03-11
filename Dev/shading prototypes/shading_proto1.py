@@ -560,7 +560,7 @@ class Screen4(QMainWindow):
                 continue
 
             try:
-                pattern = self.contours_to_embroidery_with_bridging(img_file, 8, 0.5)
+                pattern = self.contours_to_embroidery_with_bridging(img_file, 5, 0.5)
                 if pattern is None:
                     print(f"Warning: No valid pattern for {img_file}. Skipping.")
                     continue
@@ -572,7 +572,7 @@ class Screen4(QMainWindow):
                 continue
 
     def contours_to_embroidery_with_bridging(self, image_path, bridge_spacing, scale_factor):
-        max_stitch_length = 5  # adjust as needed
+        max_stitch_length = 10
 
         def subdivide_segment(start_pt, end_pt, max_stitch_length):
             (x1, y1) = start_pt
@@ -608,15 +608,23 @@ class Screen4(QMainWindow):
 
         pattern = pe.EmbPattern()
 
-
         for contour in contours:
             x, y, w, h = cv2.boundingRect(contour)
             print(f"Processing contour at (x={x}, y={y}, w={w}, h={h})")
 
             previous_end = None
+            direction = True  # Start scanning left to right
+
             for row in range(y, y + h, bridge_spacing):
                 scanline_points = []
-                for col in range(x, x + w):
+
+                # Scanline direction control
+                if direction:
+                    scan_x_range = range(x, x + w)  # Left to right
+                else:
+                    scan_x_range = range(x + w - 1, x - 1, -1)  # Right to left
+
+                for col in scan_x_range:
                     if cv2.pointPolygonTest(contour, (col, row), False) >= 0:
                         scanline_points.append((col, row))
 
@@ -627,6 +635,7 @@ class Screen4(QMainWindow):
 
                     if scanline_points[i + 1][0] - scanline_points[i][0] > 1:
                         segment_end = scanline_points[i]
+
                         if segment_start and segment_end and segment_start != segment_end:
                             first_scaled = (segment_start[0] * scale_factor, segment_start[1] * scale_factor)
                             last_scaled = (segment_end[0] * scale_factor, segment_end[1] * scale_factor)
@@ -638,18 +647,23 @@ class Screen4(QMainWindow):
                             for pt in stitch_points:
                                 pattern.add_stitch_absolute(pe.STITCH, pt[0], pt[1])
                             previous_end = stitch_points[-1]
+
                         segment_start = None
 
                 if segment_start:
                     segment_end = scanline_points[-1]
                     first_scaled = (segment_start[0] * scale_factor, segment_start[1] * scale_factor)
                     last_scaled = (segment_end[0] * scale_factor, segment_end[1] * scale_factor)
+
                     if previous_end:
                         pattern.add_stitch_absolute(pe.JUMP, previous_end[0], previous_end[1])
+
                     stitch_points = subdivide_segment(first_scaled, last_scaled, max_stitch_length)
                     for pt in stitch_points:
                         pattern.add_stitch_absolute(pe.STITCH, pt[0], pt[1])
                     previous_end = stitch_points[-1]
+
+                direction = not direction  # Switch direction for the next row
 
         pattern.end()
         print("Embroidery pattern generated.")
