@@ -294,15 +294,27 @@ class Screen3(QMainWindow):
             print("Error: No edge data available.")
             return
 
+        max_stitch_length = 5
         outfile = "emb1"
         scale_factor = 3.0
         smallthresh = self.get_small_thresh()
 
+        image = cv2.imread("edges_output.png", cv2.IMREAD_GRAYSCALE)
+
         dilated = cv2.dilate(self.edges, (3,3), iterations=1)
         contours, _ = cv2.findContours(dilated, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
 
-        contour_image = np.zeros_like(dilated)
+        contour_image = np.zeros_like(image)
         cv2.drawContours(contour_image, contours, -1, (255, 255, 255), 1)
+
+        edge_image_path = "edges_output.png"
+        success = cv2.imwrite(edge_image_path, contour_image)
+
+        if not success:
+            print("Error: Failed to save the edge-detected image.")
+            return
+
+        print(f"Edge-detected image saved as: {edge_image_path}")
 
         p1 = pe.EmbPattern()
         print(f"There are {len(contours)} contours found")
@@ -315,19 +327,48 @@ class Screen3(QMainWindow):
             stitches = [(pt[0][0] * scale_factor, pt[0][1] * scale_factor) for pt in c]
             contour_paths.append(stitches)
 
+        height, width = image.shape
+        corner_stitches = [
+            (0, 0),
+            (width * scale_factor, 0),
+            (width * scale_factor, height * scale_factor),
+            (0, height * scale_factor)
+        ]
+
         ordered_stitches = []
         current_pos = (0, 0)
 
-        while contour_paths:
-            next_contour = min(contour_paths,
-                               key=lambda path: np.linalg.norm(np.array(path[0]) - np.array(current_pos)))
-            contour_paths.remove(next_contour)
+        for corner in corner_stitches:
+            ordered_stitches.append((corner[0], corner[1], "JUMP"))
+            ordered_stitches.append((corner[0], corner[1]))
 
+        def subdivide_segment(start_pt, end_pt, max_stitch_length):
+            """Subdivide a line segment into smaller segments if it exceeds max_stitch_length."""
+            (x1, y1) = start_pt
+            (x2, y2) = end_pt
+            distance = math.hypot(x2 - x1, y2 - y1)
+            if distance <= max_stitch_length:
+                return [start_pt, end_pt]
+            num_segments = int(math.ceil(distance / max_stitch_length))
+            points = []
+            for i in range(num_segments + 1):
+                t = i / num_segments
+                x = x1 + t * (x2 - x1)
+                y = y1 + t * (y2 - y1)
+                points.append((x, y))
+            return points
+
+        for contour in contour_paths:
             if ordered_stitches:
-                ordered_stitches.append((next_contour[0][0], next_contour[0][1], "JUMP"))
+                ordered_stitches.append((contour[0][0], contour[0][1], "JUMP"))
 
-            ordered_stitches.extend(next_contour)
-            current_pos = next_contour[-1]
+            for i in range(len(contour) - 1):
+                start_stitch = contour[i]
+                end_stitch = contour[i + 1]
+
+                subdivided_stitches = subdivide_segment(start_stitch, end_stitch, max_stitch_length)
+                for stitch in subdivided_stitches:
+                    ordered_stitches.append((stitch[0], stitch[1]))
 
         for stitch in ordered_stitches:
             if isinstance(stitch, tuple) and len(stitch) == 3 and stitch[2] == "JUMP":
@@ -340,6 +381,8 @@ class Screen3(QMainWindow):
         pe.write_pes(p1, f"{outfile}.pes")
         pe.write_png(p1, f"{outfile}.png")
 
+        print(f"Embroidery pattern saved as: {outfile}.pes and {outfile}.png")
+
         pixmap = QPixmap(f"{outfile}.png")
         if pixmap.isNull():
             print("Error: Failed to load the saved image.")
@@ -350,7 +393,6 @@ class Screen3(QMainWindow):
         self.imageLabel.setScaledContents(True)
 
         print("Edge-detected image successfully loaded into QLabel.")
-
 
 
 class Screen4(QMainWindow):
