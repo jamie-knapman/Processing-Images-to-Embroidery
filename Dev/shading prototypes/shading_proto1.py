@@ -159,19 +159,18 @@ class Screen3(QMainWindow):
                 stitches = [(pt[0][0] * scale_factor, pt[0][1] * scale_factor) for pt in c]
                 contour_paths.append(stitches)
 
-            # Add stitches at each corner of the image
             height, width = image.shape
             corner_stitches = [
-                (0, 0),  # Top-left corner
-                (width * scale_factor, 0),  # Top-right corner
-                (width * scale_factor, height * scale_factor),  # Bottom-right corner
-                (0, height * scale_factor)  # Bottom-left corner
+                (0, 0),
+                (width * scale_factor, 0),
+                (width * scale_factor, height * scale_factor),
+                (0, height * scale_factor)
             ]
 
             ordered_stitches = []
             current_pos = (0, 0)
 
-            # Add corner stitches to ensure the image is fully encapsulated
+
             for corner in corner_stitches:
                 ordered_stitches.append((corner[0], corner[1], "JUMP"))
                 ordered_stitches.append((corner[0], corner[1]))
@@ -192,22 +191,19 @@ class Screen3(QMainWindow):
                     points.append((x, y))
                 return points
 
-            # Process each contour separately to avoid long connecting lines
+
             for contour in contour_paths:
                 if ordered_stitches:
-                    # Move to the start of the new contour without stitching
                     ordered_stitches.append((contour[0][0], contour[0][1], "JUMP"))
 
                 for i in range(len(contour) - 1):
                     start_stitch = contour[i]
                     end_stitch = contour[i + 1]
 
-                    # Subdivide only contour stitches
                     subdivided_stitches = subdivide_segment(start_stitch, end_stitch, max_stitch_length)
                     for stitch in subdivided_stitches:
                         ordered_stitches.append((stitch[0], stitch[1]))
 
-            # Add the stitches to the pattern
             for stitch in ordered_stitches:
                 if isinstance(stitch, tuple) and len(stitch) == 3 and stitch[2] == "JUMP":
                     p1.add_stitch_absolute(pe.JUMP, stitch[0], stitch[1])
@@ -610,7 +606,6 @@ class Screen4(QMainWindow):
     def contours_to_embroidery_with_bridging(self, image_path, bridge_spacing, scale_factor):
         max_stitch_length = 10
 
-        # Subdivide a line segment into smaller segments if it exceeds max_stitch_length.
         def subdivide_segment(start_pt, end_pt, max_stitch_length):
             (x1, y1) = start_pt
             (x2, y2) = end_pt
@@ -628,16 +623,12 @@ class Screen4(QMainWindow):
 
         print(f"Processing image: {image_path}")
 
-        # Load image as grayscale
         image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
         if image is None:
             print("Error: Unable to load image.")
             return None
-
-        # Save image dimensions for later use (to add corner stitches)
         height, width = image.shape
 
-        # Compute edges and contours (with hierarchy)
         edges = cv2.Canny(image, 50, 150)
         contours, hierarchy = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         if not contours:
@@ -645,91 +636,71 @@ class Screen4(QMainWindow):
             return None
         print(f"Contours found: {len(contours)}")
 
-        # The returned hierarchy has shape (1, numContours, 4); each element is [Next, Previous, First_Child, Parent]
         hierarchy = hierarchy[0]
 
-        # Create an EmbPattern object
+
         pattern = pe.EmbPattern()
 
-        # --- Add safety-corner stitches ---
-        # These stitches ensure that the image envelope is complete so the machine does not cut off any parts.
         corner_points = [
-            (0, 0),  # Top-left
-            (width * scale_factor, 0),  # Top-right
-            (width * scale_factor, height * scale_factor),  # Bottom-right
-            (0, height * scale_factor)  # Bottom-left
+            (0, 0),
+            (width * scale_factor, 0),
+            (width * scale_factor, height * scale_factor),
+            (0, height * scale_factor)
         ]
-        # Add a jump to the first corner then a stitch (a repeated point forces a small stitch)
+
         for corner in corner_points:
             pattern.add_stitch_absolute(pe.JUMP, corner[0], corner[1])
             pattern.add_stitch_absolute(pe.STITCH, corner[0], corner[1])
-        # (Optionally, you could also add a jump back to the first corner at the very end.)
 
-        # --- Process each contour ---
-        # We process outer contours (with no parent) with enough points.
         for idx, contour in enumerate(contours):
 
 
-            # Skip inner contours (holes)
             if hierarchy[idx][3] != -1:
                 print(f"Skipping inner (hole) contour idx {idx}.")
                 continue
 
-            # Obtain the bounding rectangle for the contour.
             x, y, w, h = cv2.boundingRect(contour)
             print(f"Processing outer contour idx {idx} at (x={x}, y={y}, w={w}, h={h}); points: {len(contour)}")
 
-            # Make sure to jump to the start of the new contour so that your bridging stitches don’t
-            # connect to the previous contour.
+
             start_pt = contour[0][0]
             start_scaled = (start_pt[0] * scale_factor, start_pt[1] * scale_factor)
             pattern.add_stitch_absolute(pe.JUMP, start_scaled[0], start_scaled[1])
 
             previous_end = None
-            direction = True  # Start scanline in left-to-right order
+            direction = True
 
-            # For each row in the bounding rectangle with the provided spacing,
-            # determine the in-contour scanline points.
             for row in range(y, y + h, bridge_spacing):
                 scanline_points = []
-                # Determine x-range based on desired scan direction.
                 if direction:
                     scan_x_range = range(x, x + w)
                 else:
                     scan_x_range = range(x + w - 1, x - 1, -1)
 
                 for col in scan_x_range:
-                    # cv2.pointPolygonTest returns >= 0 if the point is inside (or on the edge).
                     if cv2.pointPolygonTest(contour, (col, row), False) >= 0:
                         scanline_points.append((col, row))
                 if not scanline_points:
-                    # No points in this scanline – continue.
                     direction = not direction
                     continue
 
-                # Process consecutive points in this scanline as bridging segments.
                 segment_start = None
                 for i in range(len(scanline_points) - 1):
                     if segment_start is None:
                         segment_start = scanline_points[i]
-                    # If there is a gap between adjacent scanline points, end current segment.
                     if scanline_points[i + 1][0] - scanline_points[i][0] > 1:
                         segment_end = scanline_points[i]
                         if segment_start != segment_end:
-                            # Scale the segment coordinates
                             first_scaled = (segment_start[0] * scale_factor, segment_start[1] * scale_factor)
                             last_scaled = (segment_end[0] * scale_factor, segment_end[1] * scale_factor)
-                            # If a previous segment ended elsewhere, jump to the start of current segment.
                             if previous_end:
                                 pattern.add_stitch_absolute(pe.JUMP, previous_end[0], previous_end[1])
-                            # Subdivide if necessary
                             stitch_points = subdivide_segment(first_scaled, last_scaled, max_stitch_length)
                             for pt in stitch_points:
                                 pattern.add_stitch_absolute(pe.STITCH, pt[0], pt[1])
                             previous_end = stitch_points[-1]
                         segment_start = None
 
-                # If there is an unfinished segment at the end of the scanline, process it.
                 if segment_start:
                     segment_end = scanline_points[-1]
                     first_scaled = (segment_start[0] * scale_factor, segment_start[1] * scale_factor)
@@ -740,7 +711,7 @@ class Screen4(QMainWindow):
                     for pt in stitch_points:
                         pattern.add_stitch_absolute(pe.STITCH, pt[0], pt[1])
                     previous_end = stitch_points[-1]
-                direction = not direction  # Alternate the scanning direction each row
+                direction = not direction
 
         pattern.end()
         print("Embroidery pattern generated.")
