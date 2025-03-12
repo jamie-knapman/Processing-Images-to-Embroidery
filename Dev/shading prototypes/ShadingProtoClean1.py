@@ -14,49 +14,59 @@ from skimage.measure import find_contours
 import svgwrite
 
 
-
+#Class for the main opening window for the program, the user will be able to make a new design or load an old one here
 class MainWindow(QMainWindow):
     def __init__(self, stacked_widget):
         super().__init__()
         self.stacked_widget = stacked_widget
 
-
+        #Load .ui file
         uic.loadUi("MainMenu2.ui", self)
-        self.setFixedSize(800, 450)
+        self.setFixedSize(800, 450) #TODO, Change this at some point so images are displayed correctly
 
-
+        # Buttons for creating new and opening a saved Design
         self.button1 = self.findChild(QPushButton, "createNew")
         self.button2 = self.findChild(QPushButton, "openSaved")
-
+        #Button actions
         self.button1.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(1))
         self.button2.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(2))
 
+#Class for the upload image window for the program, the user will be able to upload their images here or go back to main
 class Screen1(QMainWindow):
     def __init__(self, stacked_widget):
         super().__init__()
         self.stacked_widget = stacked_widget
 
+        #Load the .ui for this window
         uic.loadUi("CreateNew2.ui", self)
-        self.setFixedSize(800, 450)
+        self.setFixedSize(800, 450) #TODO see MainWindow
 
+        #Define buttons in the window
         self.backButton = self.findChild(QPushButton, "BackToMain")
-        if self.backButton:
-            self.backButton.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(0))
-
         self.uploadButton = self.findChild(QPushButton, "UploadImage")
-        if self.uploadButton:
-            self.uploadButton.clicked.connect(self.upload_image)
-
         self.imageLabel = self.findChild(QLabel, "imageLabel")
-        if self.imageLabel:
-            self.imageLabel.setText("No Image Selected")
-
         self.NextButton = self.findChild(QPushButton, "Next")
+
+        #If X feature exists then allow click condition
+        if self.backButton:
+            #Bacl to main
+            self.backButton.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(0))
+        if self.uploadButton:
+            #Upload image
+            self.uploadButton.clicked.connect(self.upload_image)
+        if self.imageLabel:
+            #Image Label for frame
+            self.imageLabel.setText("No Image Selected")
         if self.NextButton:
+            #Proceed to next window (currently disabled in this state)
             self.NextButton.clicked.connect((lambda: self.stacked_widget.setCurrentIndex(3)))
 
+    #Upload image function
     def upload_image(self):
+        #Open file explorer and let user upload file path
         file_path, _ = QFileDialog.getOpenFileName(self, "Open Image", "", "Images (*.png *.jpg *.jpeg *.bmp)")
+
+        #If filepath exists then set it "globally" and load it into the image frame in the UI then allow next to be pressed
         if file_path:
             self.global_image = file_path
             self.pixmap = QPixmap(file_path)
@@ -66,42 +76,53 @@ class Screen1(QMainWindow):
             print(f"Image loaded: {file_path}")
 
 
+#Class for defining the outline of the image, user can do this manually or automatically.
 class Screen3(QMainWindow):
     def __init__(self, stacked_widget, screen1):
         super().__init__()
         self.stacked_widget = stacked_widget
         self.screen1 = screen1
 
+        #Load from .ui file
         uic.loadUi("Edges2.ui", self)
-        self.setFixedSize(800, 450)
+        self.setFixedSize(800, 450) #TODO see MainWindow
 
+        #Define UI features
         self.backButton = self.findChild(QPushButton, "BackToMain")
-        if self.backButton:
-            self.backButton.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(1))
-
         self.autoFind = self.findChild(QPushButton, "Auto")
-        if self.autoFind:
-            self.autoFind.clicked.connect(self.vectorise)
-
         self.imageLabel = self.findChild(QLabel, "imageLabel")
-        if self.imageLabel:
-            self.imageLabel.setText("No Image Selected")
-
         self.manualFind = self.findChild(QPushButton, "Manual")
-        if self.manualFind:
-            self.manualFind.clicked.connect(self.cannyTrackbars)
-
         self.smallThreshIn = self.findChild(QPlainTextEdit, "smallThreshIn")
-        if not self.smallThreshIn:
-            print("Error: smallThreshIn QPlainTextEdit not found.")
-
         self.nextButton = self.findChild(QPushButton, "next")
-        self.nextButton.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(4))
 
+        #If X feature exists then process input logic
+        if self.backButton:
+            #Back to prev
+            self.backButton.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(1))
+        if self.autoFind:
+            #Auto find edges
+            self.autoFind.clicked.connect(self.vectorise)
+        if self.imageLabel:
+            #Image frame and label
+            self.imageLabel.setText("No Image Selected")
+        if self.manualFind:
+            #Manually find edges
+            self.manualFind.clicked.connect(self.cannyTrackbars)
+        if not self.smallThreshIn:
+            #This is the text box in the UI, it defines the threshold that small contours will be ignored
+            print("Error: smallThreshIn QPlainTextEdit not found.")
+        if self.nextButton:
+            #Go to Next screen, currently disabled
+            self.nextButton.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(4))
+
+    #Get the text from the text box for thresholding small contours
     def get_small_thresh(self):
+        #Default to 6
         if not self.smallThreshIn:
             return 6
 
+
+        #Get text and assign threshold, if invalid then default to 6
         text = self.smallThreshIn.toPlainText().strip()
         try:
             return int(text)
@@ -112,243 +133,161 @@ class Screen3(QMainWindow):
                 print("Invalid input. Using default threshold (6).")
                 return 6
 
+    #Auto find edges function
     def vectorise(self):
+        #Prevents crashes
         try:
+            #Obtain threshold, define a scale factor and max stitch length
             smallthresh = self.get_small_thresh()
             scale_factor = 1.0
-            max_stitch_length = 30.0
+            max_stitch_length = 10.0
 
-            if not hasattr(self.screen1, "global_image") or not self.screen1.global_image:
-                print("Error: No image loaded.")
-                return
-
+            #Obtain image through screen1 TODO change this condition
             image_path = self.screen1.global_image
-            print(f"Processing image: {image_path}")
 
+            #Read image into grey scale
             image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-            if image is None:
-                print("Error: Unable to read the image.")
-                return
+            #Set next button as enabled TODO move just incase errors are made
             self.nextButton.setEnabled(True)
 
+            #Canny Edge detection
             edges = cv2.Canny(image, 50, 150)
+            #Pull contours using Tree, seems to work best
             contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
+            #Create a blank canvas the same size as original image and draw found edges, Black and White
             contour_image = np.zeros_like(image)
             cv2.drawContours(contour_image, contours, -1, (255, 255, 255), 1)
 
+            #Save image as edges output
             edge_image_path = "edges_output.png"
-            success = cv2.imwrite(edge_image_path, contour_image)
+            cv2.imwrite(edge_image_path, contour_image)
 
-            if not success:
-                print("Error: Failed to save the edge-detected image.")
-                return
-
-            print(f"Edge-detected image saved as: {edge_image_path}")
-
+            #Embroidery fileName for outlines #TODO change eventually
             outfile = "emb1"
 
-            p1 = pe.EmbPattern()
-            print(f"There are {len(contours)} contours found")
+            pattern = self.writeStitches(contours, smallthresh, scale_factor, image, max_stitch_length)
+            #Write .pes and .png files for p1
+            pe.write_pes(pattern, f"{outfile}.pes")
+            pe.write_png(pattern, f"{outfile}.png")
 
-            contour_paths = []
-            for c in contours:
-                if len(c) < smallthresh:
-                    continue
-
-                stitches = [(pt[0][0] * scale_factor, pt[0][1] * scale_factor) for pt in c]
-                contour_paths.append(stitches)
-
-            height, width = image.shape
-            corner_stitches = [
-                (0, 0),
-                (width * scale_factor, 0),
-                (width * scale_factor, height * scale_factor),
-                (0, height * scale_factor)
-            ]
-
-            ordered_stitches = []
-            current_pos = (0, 0)
-
-
-            for corner in corner_stitches:
-                ordered_stitches.append((corner[0], corner[1], "JUMP"))
-                ordered_stitches.append((corner[0], corner[1]))
-
-            def subdivide_segment(start_pt, end_pt, max_stitch_length):
-                """Subdivide a line segment into smaller segments if it exceeds max_stitch_length."""
-                (x1, y1) = start_pt
-                (x2, y2) = end_pt
-                distance = math.hypot(x2 - x1, y2 - y1)
-                if distance <= max_stitch_length:
-                    return [start_pt, end_pt]
-                num_segments = int(math.ceil(distance / max_stitch_length))
-                points = []
-                for i in range(num_segments + 1):
-                    t = i / num_segments
-                    x = x1 + t * (x2 - x1)
-                    y = y1 + t * (y2 - y1)
-                    points.append((x, y))
-                return points
-
-
-            for contour in contour_paths:
-                if ordered_stitches:
-                    ordered_stitches.append((contour[0][0], contour[0][1], "JUMP"))
-
-                for i in range(len(contour) - 1):
-                    start_stitch = contour[i]
-                    end_stitch = contour[i + 1]
-
-                    subdivided_stitches = subdivide_segment(start_stitch, end_stitch, max_stitch_length)
-                    for stitch in subdivided_stitches:
-                        ordered_stitches.append((stitch[0], stitch[1]))
-
-            for stitch in ordered_stitches:
-                if isinstance(stitch, tuple) and len(stitch) == 3 and stitch[2] == "JUMP":
-                    p1.add_stitch_absolute(pe.JUMP, stitch[0], stitch[1])
-                else:
-                    p1.add_stitch_absolute(pe.STITCH, stitch[0], stitch[1])
-
-            '''
-            ordered_stitches = []
-        current_pos = (0, 0)
-
-        while contour_paths:
-            next_contour = min(contour_paths,
-                               key=lambda path: np.linalg.norm(np.array(path[0]) - np.array(current_pos)))
-            contour_paths.remove(next_contour)
-
-            if ordered_stitches:
-                ordered_stitches.append((next_contour[0][0], next_contour[0][1], "JUMP"))
-
-            ordered_stitches.extend(next_contour)
-            current_pos = next_contour[-1]
-
-        for stitch in ordered_stitches:
-            if isinstance(stitch, tuple) and len(stitch) == 3 and stitch[2] == "JUMP":
-                p1.add_stitch_absolute(pe.JUMP, stitch[0], stitch[1])
-            else:
-                p1.add_stitch_absolute(pe.STITCH, stitch[0], stitch[1])
-                '''
-            p1.end()
-
-            pe.write_pes(p1, f"{outfile}.pes")
-            pe.write_png(p1, f"{outfile}.png")
-
-            print(f"Embroidery pattern saved as: {outfile}.pes and {outfile}.png")
-
+            #Load emb1.png into image frame on UI
             pixmap = QPixmap(f"{outfile}.png")
-            if pixmap.isNull():
-                print("Error: Failed to load the saved image.")
-                return
-
             pixmap = pixmap.scaled(300, 200, Qt.AspectRatioMode.KeepAspectRatio)
             self.imageLabel.setPixmap(pixmap)
             self.imageLabel.setScaledContents(True)
 
-            print("Edge-detected image successfully loaded into QLabel.")
-
         except Exception as e:
+            #Error handling and crash prevention
             print(f"An error occurred: {e}")
 
     def cannyTrackbars(self):
-        if not hasattr(self.screen1, "global_image") or not self.screen1.global_image:
-            print("Error: No image loaded.")
-            return
-
+        #Set global image to local path
         image_path = self.screen1.global_image
-        print(f"Processing image: {image_path}")
 
+        #Read the image
         image = cv2.imread(image_path)
-        if image is None:
-            print("Error: Unable to read the image.")
-            return
 
+        #Gray and blur
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         blurred = cv2.GaussianBlur(gray, (5, 5), 1.4)
 
-
-        if not hasattr(self, "lowThresh") or not hasattr(self, "highThresh"):
-            print("Error: Threshold sliders not found.")
-            return
-
-
+        #Enable track bars
         self.lowThresh.setEnabled(True)
         self.highThresh.setEnabled(True)
 
+        #Detect changes and update edges
         self.lowThresh.valueChanged.connect(lambda: self.update_edges(blurred))
         self.highThresh.valueChanged.connect(lambda: self.update_edges(blurred))
-
         self.update_edges(blurred)
 
+        #Submit for finalising edge detection
         self.submit = self.findChild(QPushButton, "Submit")
         if self.submit:
+            #Write the design
             self.submit.clicked.connect(lambda: self.writeManual())
         self.submit.setEnabled(True)
 
     def update_edges(self, blurred):
+        #Obtain values
         low = self.lowThresh.value()
         high = self.highThresh.value()
 
+        #Obtain edges
         self.edges = cv2.Canny(blurred, low, high)
         edge_image_path = "edges_output.png"
 
-        success = cv2.imwrite(edge_image_path, self.edges)
-        if not success:
-            print("Error: Failed to save the edge-detected image.")
-            return
+        #Write image
+        cv2.imwrite(edge_image_path, self.edges)
 
-        print(f"Edge-detected image saved as: {edge_image_path}")
-
+        #Load image into frame TODO change this
         pixmap = QPixmap(edge_image_path)
         if pixmap.isNull():
             print("Error: Failed to load the saved image.")
             return
-
         pixmap = pixmap.scaled(300, 200, Qt.AspectRatioMode.KeepAspectRatio)
         self.imageLabel.setPixmap(pixmap)
         self.imageLabel.setScaledContents(True)
 
     def writeManual(self):
-        if not hasattr(self, "edges") or self.edges is None:
-            print("Error: No edge data available.")
-            return
-
-        max_stitch_length = 30
+        #Define dependencies
+        max_stitch_length = 10
         outfile = "emb1"
         scale_factor = 1.0
         smallthresh = self.get_small_thresh()
-
         image = cv2.imread("edges_output.png", cv2.IMREAD_GRAYSCALE)
+        contours = self.readImg(image)
+        #Get pattern
+        pattern = self.writeStitches(contours, smallthresh, scale_factor, image, max_stitch_length)
+        #Write files
+        pe.write_pes(pattern, f"{outfile}.pes")
+        pe.write_png(pattern, f"{outfile}.png")
 
-        dilated = cv2.dilate(self.edges, (3,3), iterations=1)
-        contours, _ = cv2.findContours(dilated, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+
+
+        #Load to label TODO change this
+        pixmap = QPixmap(f"{outfile}.png")
+        if pixmap.isNull():
+            print("Error: Failed to load the saved image.")
+            return
+        pixmap = pixmap.scaled(300, 200, Qt.AspectRatioMode.KeepAspectRatio)
+        self.imageLabel.setPixmap(pixmap)
+        self.imageLabel.setScaledContents(True)
+
+
+    def readImg(self, image):
+        #Read image and collect contours TODO add this for vectorise in same funct
+        dilated = cv2.dilate(self.edges, (3, 3), iterations=1)
+        contours, _ = cv2.findContours(dilated, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
 
         contour_image = np.zeros_like(image)
         cv2.drawContours(contour_image, contours, -1, (255, 255, 255), 1)
 
         edge_image_path = "edges_output.png"
-        success = cv2.imwrite(edge_image_path, contour_image)
+        cv2.imwrite(edge_image_path, contour_image)
 
-        if not success:
-            print("Error: Failed to save the edge-detected image.")
-            return
+        return contours
 
-        print(f"Edge-detected image saved as: {edge_image_path}")
-
+    def writeStitches(self, contours, smallthresh, scale_factor, image, max_stitch_length):
+        # Create the Pattern as p1
         p1 = pe.EmbPattern()
-        print(f"There are {len(contours)} contours found")
 
+        # The path of each contour found in the image
         contour_paths = []
         for c in contours:
+            # Each contour must exceed the threshold
             if len(c) < smallthresh:
                 continue
 
+            # Define all stitches needed to make that contour
             stitches = [(pt[0][0] * scale_factor, pt[0][1] * scale_factor) for pt in c]
+            # Add stitches to the paths
             contour_paths.append(stitches)
 
+        # This section is preventing the "bounding box problem" allowing the full image to be displayed
+        # Define the height and width of the image
         height, width = image.shape
+        # Define all corners of the image
         corner_stitches = [
             (0, 0),
             (width * scale_factor, 0),
@@ -356,67 +295,59 @@ class Screen3(QMainWindow):
             (0, height * scale_factor)
         ]
 
+        # Stitches need to be organised to prevent unnesscary jumping
         ordered_stitches = []
         current_pos = (0, 0)
 
+        # Jump between all corners and make a stitch, not visible on final design just defining extremes
         for corner in corner_stitches:
             ordered_stitches.append((corner[0], corner[1], "JUMP"))
             ordered_stitches.append((corner[0], corner[1]))
 
-        def subdivide_segment(start_pt, end_pt, max_stitch_length):
-            """Subdivide a line segment into smaller segments if it exceeds max_stitch_length."""
-            (x1, y1) = start_pt
-            (x2, y2) = end_pt
-            distance = math.hypot(x2 - x1, y2 - y1)
-            if distance <= max_stitch_length:
-                return [start_pt, end_pt]
-            num_segments = int(math.ceil(distance / max_stitch_length))
-            points = []
-            for i in range(num_segments + 1):
-                t = i / num_segments
-                x = x1 + t * (x2 - x1)
-                y = y1 + t * (y2 - y1)
-                points.append((x, y))
-            return points
-
         for contour in contour_paths:
+            # If ordered stitches exists, add the contour to it
             if ordered_stitches:
                 ordered_stitches.append((contour[0][0], contour[0][1], "JUMP"))
 
+            # Add each subdivided segment to ordered stitches
             for i in range(len(contour) - 1):
                 start_stitch = contour[i]
                 end_stitch = contour[i + 1]
 
-                subdivided_stitches = subdivide_segment(start_stitch, end_stitch, max_stitch_length)
+                subdivided_stitches = self.subdivide_segment(start_stitch, end_stitch, max_stitch_length)
                 for stitch in subdivided_stitches:
                     ordered_stitches.append((stitch[0], stitch[1]))
 
-        stitches = 0
+        # Add stitches in array to the pattern where if the stitch is ended it jumps otherwise it moves to other stitch
         for stitch in ordered_stitches:
             if isinstance(stitch, tuple) and len(stitch) == 3 and stitch[2] == "JUMP":
                 p1.add_stitch_absolute(pe.JUMP, stitch[0], stitch[1])
-                stitches += 1
             else:
                 p1.add_stitch_absolute(pe.STITCH, stitch[0], stitch[1])
-                stitches += 1
+
+        # End the pattern
         p1.end()
-        print("STITCHES BELOW")
-        print(stitches)
-        pe.write_pes(p1, f"{outfile}.pes")
-        pe.write_png(p1, f"{outfile}.png")
+        return p1
 
-        print(f"Embroidery pattern saved as: {outfile}.pes and {outfile}.png")
-
-        pixmap = QPixmap(f"{outfile}.png")
-        if pixmap.isNull():
-            print("Error: Failed to load the saved image.")
-            return
-
-        pixmap = pixmap.scaled(300, 200, Qt.AspectRatioMode.KeepAspectRatio)
-        self.imageLabel.setPixmap(pixmap)
-        self.imageLabel.setScaledContents(True)
-
-        print("Edge-detected image successfully loaded into QLabel.")
+    # Divide each "long stitch" into smaller segments based of max_stitch_length
+    def subdivide_segment(self, start_pt, end_pt, max_stitch_length):
+        (x1, y1) = start_pt  # Stasrt point
+        (x2, y2) = end_pt  # End point
+        distance = math.hypot(x2 - x1, y2 - y1)  # Define the distance between start and end of long stitch
+        # Incorrect call to this function as dist < max len
+        if distance <= max_stitch_length:
+            return [start_pt, end_pt]
+        # How many segments does this line need
+        num_segments = int(math.ceil(distance / max_stitch_length))
+        points = []
+        # Loop though and append all valid "points" to the array
+        for i in range(num_segments + 1):
+            t = i / num_segments
+            x = x1 + t * (x2 - x1)
+            y = y1 + t * (y2 - y1)
+            points.append((x, y))
+        # Return list of points
+        return points
 
 
 class Screen4(QMainWindow):
@@ -658,7 +589,7 @@ class Screen4(QMainWindow):
                 continue
 
             try:
-                pattern = self.contours_to_embroidery_with_bridging(img_file, 4, 1.0)
+                pattern = self.contours_to_embroidery_with_bridging(img_file, 8, 1.0)
                 if pattern is None:
                     print(f"Warning: No valid pattern for {img_file}. Skipping.")
                     continue
@@ -670,7 +601,7 @@ class Screen4(QMainWindow):
                 continue
 
     def contours_to_embroidery_with_bridging(self, image_path, bridge_spacing, scale_factor):
-        max_stitch_length = 30
+        max_stitch_length = 10
 
         def subdivide_segment(start_pt, end_pt, max_stitch_length):
             (x1, y1) = start_pt

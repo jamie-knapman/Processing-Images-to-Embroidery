@@ -150,6 +150,7 @@ class Screen3(QMainWindow):
 
         ordered_stitches = []
         current_pos = (0, 0)
+        stitches = 0
 
         while contour_paths:
             next_contour = min(contour_paths,
@@ -165,11 +166,14 @@ class Screen3(QMainWindow):
         for stitch in ordered_stitches:
             if isinstance(stitch, tuple) and len(stitch) == 3 and stitch[2] == "JUMP":
                 p1.add_stitch_absolute(pe.JUMP, stitch[0], stitch[1])
+                stitches += 1
             else:
                 p1.add_stitch_absolute(pe.STITCH, stitch[0], stitch[1])
+                stitches += 1
 
         p1.end()
-
+        print("STITCHES BELOW")
+        print(stitches)
         pe.write_pes(p1, f"{outfile}.pes")
         pe.write_png(p1, f"{outfile}.png")
 
@@ -281,14 +285,18 @@ class Screen3(QMainWindow):
             ordered_stitches.extend(next_contour)
             current_pos = next_contour[-1]
 
+        stitches = 0
         for stitch in ordered_stitches:
             if isinstance(stitch, tuple) and len(stitch) == 3 and stitch[2] == "JUMP":
                 p1.add_stitch_absolute(pe.JUMP, stitch[0], stitch[1])
+                stitches += 1
             else:
                 p1.add_stitch_absolute(pe.STITCH, stitch[0], stitch[1])
+                stitches += 1
 
         p1.end()
-
+        print("STITCHES BELOW")
+        print(stitches)
         pe.write_pes(p1, f"{outfile}.pes")
         pe.write_png(p1, f"{outfile}.png")
 
