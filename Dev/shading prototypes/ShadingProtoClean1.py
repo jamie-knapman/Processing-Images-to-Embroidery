@@ -233,7 +233,7 @@ class Screen3(QMainWindow):
         #Define dependencies
         max_stitch_length = 10
         outfile = "emb1"
-        scale_factor = 1.0
+        scale_factor = 2.0
         smallthresh = self.get_small_thresh()
         image = cv2.imread("edges_output.png", cv2.IMREAD_GRAYSCALE)
         contours = self.readImg(image)
@@ -258,7 +258,7 @@ class Screen3(QMainWindow):
     def readImg(self, image):
         #Read image and collect contours TODO add this for vectorise in same funct
         dilated = cv2.dilate(self.edges, (3, 3), iterations=1)
-        contours, _ = cv2.findContours(dilated, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+        contours, _ = cv2.findContours(dilated, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
         contour_image = np.zeros_like(image)
         cv2.drawContours(contour_image, contours, -1, (255, 255, 255), 1)
@@ -303,7 +303,7 @@ class Screen3(QMainWindow):
         for corner in corner_stitches:
             ordered_stitches.append((corner[0], corner[1], "JUMP"))
             ordered_stitches.append((corner[0], corner[1]))
-
+        '''
         for contour in contour_paths:
             # If ordered stitches exists, add the contour to it
             if ordered_stitches:
@@ -317,16 +317,40 @@ class Screen3(QMainWindow):
                 subdivided_stitches = self.subdivide_segment(start_stitch, end_stitch, max_stitch_length)
                 for stitch in subdivided_stitches:
                     ordered_stitches.append((stitch[0], stitch[1]))
+                    
+                    
+        '''
 
+        while contour_paths:
+            #Find th closest contour to the current position
+            #converts each contour position path[0] and currentpos into numoy arrays and calculates the distnace between the returning th min
+            next_contour = min(contour_paths, key=lambda path: np.linalg.norm(np.array(path[0]) - np.array(current_pos)))
+            #remove since not using anymore
+            contour_paths.remove(next_contour)
+
+            if ordered_stitches:
+                ordered_stitches.append((next_contour[0][0], next_contour[0][1], "JUMP"))
+
+            ordered_stitches.extend(next_contour)
+            current_pos = next_contour[-1]
+
+
+
+        stitches = 0
         # Add stitches in array to the pattern where if the stitch is ended it jumps otherwise it moves to other stitch
         for stitch in ordered_stitches:
             if isinstance(stitch, tuple) and len(stitch) == 3 and stitch[2] == "JUMP":
                 p1.add_stitch_absolute(pe.JUMP, stitch[0], stitch[1])
+                stitches += 1
             else:
                 p1.add_stitch_absolute(pe.STITCH, stitch[0], stitch[1])
+                stitches += 1
+
 
         # End the pattern
         p1.end()
+        print("TOTAL Stitches")
+        print(stitches)
         return p1
 
     # Divide each "long stitch" into smaller segments based of max_stitch_length
@@ -349,21 +373,23 @@ class Screen3(QMainWindow):
         # Return list of points
         return points
 
-
+#Class for obtaining the shading of images
 class Screen4(QMainWindow):
     def __init__(self, stacked_widget, screen1):
         super().__init__()
         self.stacked_widget = stacked_widget
         self.screen1 = screen1
 
-
+        #Load UI from .ui file
         uic.loadUi("Shading2.ui", self)
         self.setFixedSize(800, 450)
 
+        #Button for segmenting the colours of the image
         self.auto = self.findChild(QPushButton, "Auto")
         if self.auto:
             self.auto.clicked.connect(self.segmentColours)
 
+        #All checkboxes for each colour
         self.red1 = self.findChild(QCheckBox, "red1")
         self.red2 = self.findChild(QCheckBox, "red2")
         self.yellow = self.findChild(QCheckBox, "yellow")
@@ -382,36 +408,43 @@ class Screen4(QMainWindow):
         self.gray = self.findChild(QCheckBox, "gray")
         self.white = self.findChild(QCheckBox, "white")
 
-
+        #arrays and dicts for segmented images and each chosen bridge
         self.segmented_images = {}
         self.colourBridge = []
 
+
+        #Button for user to reconstruct the image
         self.reconstruct = self.findChild(QPushButton, "reconstruct")
         if self.reconstruct:
             self.reconstruct.clicked.connect(self.reconstructImg)
 
+        #Button for generating the final shading patterns
         self.generate = self.findChild(QPushButton, "generate")
         if self.generate:
             self.generate.clicked.connect(self.generateImg)
 
+        #Reconstruct the final image
         self.finalise = self.findChild(QPushButton, "finalise")
         if self.finalise:
             self.finalise.clicked.connect(self.reconstructGenImg)
 
     def segmentColours(self):
+        #Make sure this function can see the image from the start
         if not hasattr(self.screen1, "global_image") or not self.screen1.global_image:
             print("Error: No image loaded.")
             return
-
+        #Load the image locally
         imgPath = self.screen1.global_image
         image = cv2.imread(imgPath)
         if image is None:
             print("Error: Unable to read the image.")
             return
 
-
+        #Load the image into the BGR space
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
+        #Define colours
+        #TODO broaden scope
         color_ranges = {
             "red": [(0, 100, 50), (10, 255, 255)],
             "red2": [(170, 100, 50), (180, 255, 255)],
@@ -432,22 +465,28 @@ class Screen4(QMainWindow):
             "white": [(0, 0, 200), (180, 55, 255)],
         }
 
-
+        #Min pixels needed to segment colours
+        #TODO let user choose this value
         PIXEL_THRESHOLD = 500
 
+        #Main segmented colours
         mainColours = []
 
+        #Cycle through each main colour
         for name, (lower, upper) in color_ranges.items():
+            #Upper and lower colour bands
             lower = np.array(lower, dtype="uint8")
             upper = np.array(upper, dtype="uint8")
 
-
+            #Create image frame
             mask = cv2.inRange(hsv, lower, upper)
             result = cv2.bitwise_and(image, image, mask=mask)
 
-
+            #Create a count for the non black pixels in the segment
+            #TODO account for black pixels in dark images
             non_black_pixels = cv2.countNonZero(mask)
 
+            #If the count is creater than the threshhold then same the colour
             if non_black_pixels >= PIXEL_THRESHOLD:
                 output_path = f"{name}.png"
                 cv2.imwrite(output_path, result)
@@ -456,30 +495,8 @@ class Screen4(QMainWindow):
                 self.segmented_images[name] = result
             else:
                 print(f"Skipped: {name} (Only {non_black_pixels} pixels)")
-        '''
-        red1 = cv2.imread("red.png")
-        red2 = cv2.imread("red2.png")
 
-        if red1 is None or red2 is None:
-            print("Error: One or both red images could not be loaded.")
-            return
-        if red1 is not None and red2 is not None:
-            if red1.shape != red2.shape:
-                red2 = cv2.resize(red2, (red1.shape[1], red1.shape[0]))
-            merged_red = cv2.addWeighted(red1, 1, red2, 1, 0)
-
-            red_mask = cv2.inRange(hsv, np.array([0, 100, 50]), np.array([10, 255, 255])) + \
-                       cv2.inRange(hsv, np.array([170, 100, 50]), np.array([180, 255, 255]))
-
-            if cv2.countNonZero(red_mask) >= PIXEL_THRESHOLD:
-                cv2.imwrite("red_combined.png", merged_red)
-                print("Saved: red_combined.png")
-            else:
-                print("Skipped: red_combined (Too few pixels)")
-        '''
-
-        print("Segmentation complete. Check the output images.")
-
+        #Enable checkboxes for foumd colours
         for i in range(len(mainColours)):
             if mainColours[i] == "red":
                 self.red1.setEnabled(True)
@@ -589,7 +606,7 @@ class Screen4(QMainWindow):
                 continue
 
             try:
-                pattern = self.contours_to_embroidery_with_bridging(img_file, 8, 1.0)
+                pattern = self.contours_to_embroidery_with_bridging(img_file, 5, 2.0)
                 if pattern is None:
                     print(f"Warning: No valid pattern for {img_file}. Skipping.")
                     continue
@@ -653,7 +670,7 @@ class Screen4(QMainWindow):
 
 
             if hierarchy[idx][3] != -1:
-                print(f"Skipping inner (hole) contour idx {idx}.")
+                print(f"Skipping inner (hole) contour idx {idx}. and coordinate {contour}")
                 continue
 
             x, y, w, h = cv2.boundingRect(contour)
