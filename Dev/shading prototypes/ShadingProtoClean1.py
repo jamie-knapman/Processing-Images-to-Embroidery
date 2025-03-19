@@ -606,7 +606,7 @@ class Screen4(QMainWindow):
                 continue
 
             try:
-                pattern = self.contours_to_embroidery_with_bridging(img_file, 5, 2.0)
+                pattern = self.image_to_stitch_pattern(img_file, 5, 2.0, 5)
                 if pattern is None:
                     print(f"Warning: No valid pattern for {img_file}. Skipping.")
                     continue
@@ -617,7 +617,83 @@ class Screen4(QMainWindow):
                 print(f"Critical Error processing {img_file}: {e}")
                 continue
 
+    def image_to_stitch_pattern(self, image_path, bridge_spacing=3, scale_factor=1.0,max_stitch_length = 10, kernel_size=3):
+        #Function to subdivide long stitch segments into smaller ones
+        def subdivide_segment(start_pt, end_pt, max_stitch_length):
+            (x1, y1) = start_pt
+            (x2, y2) = end_pt
+            distance = math.hypot(x2 - x1, y2 - y1)
+            if distance <= max_stitch_length:
+                return [start_pt, end_pt]
+            num_segments = int(math.ceil(distance / max_stitch_length))
+            points = [(x1 + t * (x2 - x1), y1 + t * (y2 - y1)) for t in np.linspace(0, 1, num_segments + 1)]
+            return points
+
+        #Load the image
+        image = cv2.imread(image_path)
+        if image is None:
+            print("Error: Unable to load image.")
+            return None
+
+        #Convert image to RGB and create a binary mask (non-black pixels = 1, black = 0)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        mask = np.any(image != [0, 0, 0], axis=-1).astype(np.uint8)
+        height, width = mask.shape
+
+        #Create an embroidery pattern
+        pattern = pe.EmbPattern()
+        direction = True #Left to Right = True, Right to Left = False
+
+        #Process the image row by row based on bridge spacing
+        for y in range(0, height, bridge_spacing):
+            inside_shape = False
+            start_x = None
+            previous_end = None
+            scan_x_range = range(0, width) if direction else range(width - 1, -1, -1)#Alternate scan direction
+
+            #Scan through each pixel in the row
+            for x in scan_x_range:
+                #Extract a kernel (small window) around the current pixel
+                kernel = mask[max(0, y - kernel_size // 2):min(height, y + kernel_size // 2 + 1),
+                         max(0, x - kernel_size // 2):min(width, x + kernel_size // 2 + 1)]
+
+                non_black_count = np.sum(kernel) #Count non-black pixels in the kernel
+                threshold = kernel.size // 2 #Determine if we are inside the shape
+
+                if non_black_count > threshold:
+                    if not inside_shape: #Entering the shape
+                        start_x = x
+                        inside_shape = True
+                else:
+                    if inside_shape and start_x is not None:
+                        first_scaled = (start_x * scale_factor, y * scale_factor)
+                        last_scaled = (x * scale_factor, y * scale_factor)
+                        if previous_end:
+                            pattern.add_stitch_absolute(pe.JUMP, previous_end[0], previous_end[1])
+                        stitch_points = subdivide_segment(first_scaled, last_scaled, max_stitch_length)
+                        for pt in stitch_points:
+                            pattern.add_stitch_absolute(pe.STITCH, pt[0], pt[1])
+                        previous_end = stitch_points[-1]
+                        inside_shape = False
+
+            #If we end the row inside the shape, complete the segment
+            if inside_shape and start_x is not None:
+                first_scaled = (start_x * scale_factor, y * scale_factor)
+                last_scaled = (width * scale_factor if direction else 0, y * scale_factor)
+                if previous_end:
+                    pattern.add_stitch_absolute(pe.JUMP, previous_end[0], previous_end[1])
+                stitch_points = subdivide_segment(first_scaled, last_scaled, max_stitch_length)
+                for pt in stitch_points:
+                    pattern.add_stitch_absolute(pe.STITCH, pt[0], pt[1])
+                previous_end = stitch_points[-1]
+
+            direction = not direction
+
+        pattern.end()
+        return pattern
+    '''
     def contours_to_embroidery_with_bridging(self, image_path, bridge_spacing, scale_factor):
+        #ORIGINAL
         max_stitch_length = 10
 
         def subdivide_segment(start_pt, end_pt, max_stitch_length):
@@ -665,6 +741,7 @@ class Screen4(QMainWindow):
         for corner in corner_points:
             pattern.add_stitch_absolute(pe.JUMP, corner[0], corner[1])
             pattern.add_stitch_absolute(pe.STITCH, corner[0], corner[1])
+
 
         for idx, contour in enumerate(contours):
 
@@ -730,7 +807,7 @@ class Screen4(QMainWindow):
         pattern.end()
         print("Embroidery pattern generated.")
         return pattern
-
+        '''
 
 
     def reconstructGenImg(self):
