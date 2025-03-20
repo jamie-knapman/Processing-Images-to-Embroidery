@@ -412,7 +412,6 @@ class Screen4(QMainWindow):
         self.segmented_images = {}
         self.colourBridge = []
 
-
         #Button for user to reconstruct the image
         self.reconstruct = self.findChild(QPushButton, "reconstruct")
         if self.reconstruct:
@@ -606,7 +605,7 @@ class Screen4(QMainWindow):
                 continue
 
             try:
-                pattern = self.image_to_stitch_pattern(img_file, 5, 2.0, 5)
+                pattern = self.image_to_stitch_pattern(img_file, 5, 1.0, 5, 3)
                 if pattern is None:
                     print(f"Warning: No valid pattern for {img_file}. Skipping.")
                     continue
@@ -617,7 +616,7 @@ class Screen4(QMainWindow):
                 print(f"Critical Error processing {img_file}: {e}")
                 continue
 
-    def image_to_stitch_pattern(self, image_path, bridge_spacing=3, scale_factor=1.0,max_stitch_length = 10, kernel_size=3):
+    def image_to_stitch_pattern(self, image_path, bridge_spacing, scale_factor,max_stitch_length, kernel_size):
         #Function to subdivide long stitch segments into smaller ones
         def subdivide_segment(start_pt, end_pt, max_stitch_length):
             (x1, y1) = start_pt
@@ -643,6 +642,25 @@ class Screen4(QMainWindow):
         #Create an embroidery pattern
         pattern = pe.EmbPattern()
         direction = True #Left to Right = True, Right to Left = False
+
+        #This section is preventing the "bounding box problem" allowing the full image to be displayed
+        #Define the height and width of the image
+        h1, w1 = mask.shape  #Use mask instead of image
+        #Define all corners of the image
+        corner_stitches = [
+            (0, 0),
+            (w1 * scale_factor, 0),
+            (w1 * scale_factor, h1 * scale_factor),
+            (0, h1 * scale_factor)
+        ]
+
+        #Jump between all corners and make a stitch, not visible on final design just defining extremes
+        for corner in corner_stitches:
+            #Jump to the corner
+            pattern.add_stitch_absolute(pe.JUMP, corner[0], corner[1])
+            #Make a stitch at the corner
+            pattern.add_stitch_absolute(pe.STITCH, corner[0], corner[1])
+
 
         #Process the image row by row based on bridge spacing
         for y in range(0, height, bridge_spacing):
@@ -811,7 +829,49 @@ class Screen4(QMainWindow):
 
 
     def reconstructGenImg(self):
-        print("placehold")
+        print("Selected Colors:", self.colourBridge)
+
+        #Load the original image to determine canvas size
+        imgPath = self.screen1.global_image
+        original = cv2.imread(imgPath)
+
+        if original is None:
+            print("Error: Unable to read the original image.")
+            return
+
+        #Create a blank canvas (white) with the same size as the original image
+        height, width = original.shape[:2]
+        reconstructed = np.ones((height, width, 3), dtype=np.uint8) * 255
+
+        try:
+            for name in self.colourBridge:
+                pes_path = os.path.join(f"{name}Bridge.pes")
+
+                #Load PES file
+                pattern = pe.read(pes_path)
+                if pattern is None:
+                    print(f"Error: Unable to read {pes_path}")
+                    continue
+
+                #Choose a color for this pattern (customize if needed)
+                color = (np.random.randint(0, 255), np.random.randint(0, 255), np.random.randint(0, 255))
+
+                #Draw stitches onto the image exactly as they are
+                for i in range(len(pattern.stitches) - 1):
+                    x1, y1, cmd1 = pattern.stitches[i]
+                    x2, y2, cmd2 = pattern.stitches[i + 1]
+
+                    #Only draw STITCH commands (ignore JUMP/TRIM commands)
+                    if cmd1 == pe.STITCH and cmd2 == pe.STITCH:
+                        cv2.line(reconstructed, (int(x1), int(y1)), (int(x2), int(y2)), color, 1)
+
+            #Save the final reconstructed image
+            cv2.imwrite("reconstructedFinal.png", reconstructed)
+            print("Reconstructed image saved as reconstructedFinal.png")
+
+        except Exception as e:
+            print(f"Critical Error processing PES files: {e}")
+
 
 
 
