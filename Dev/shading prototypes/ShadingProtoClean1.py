@@ -12,6 +12,9 @@ import math
 import matplotlib.pyplot as plt
 from skimage.measure import find_contours
 import svgwrite
+from scipy.spatial import KDTree
+from scipy.sparse.csgraph import minimum_spanning_tree
+from scipy.sparse import csr_matrix
 
 
 #Class for the main opening window for the program, the user will be able to make a new design or load an old one here
