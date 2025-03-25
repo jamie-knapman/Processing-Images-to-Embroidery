@@ -712,61 +712,23 @@ class Screen4(QMainWindow):
         if not stitch_points:
             return []
 
-        # Group points by rows
-        stitch_points.sort(key=lambda p: p[1])  # Sort by Y coordinate
+        # Start with the first point
+        unvisited = set(range(len(stitch_points)))
+        path = [0]  # Start with the first point
+        unvisited.remove(0)
 
-        # Create rows
-        rows = []
-        current_row = []
-        current_y = stitch_points[0][1]
+        while unvisited:
+            current = path[-1]
+            # Find the nearest unvisited point
+            nearest = min(unvisited,
+                          key=lambda i: np.linalg.norm(np.array(stitch_points[current]) - np.array(stitch_points[i])))
 
-        for point in stitch_points:
-            if abs(point[1] - current_y) > 10:  # Threshold for new row
-                rows.append(current_row)
-                current_row = []
-                current_y = point[1]
-            current_row.append(point)
+            path.append(nearest)
+            unvisited.remove(nearest)
 
-        if current_row:
-            rows.append(current_row)
-
-        # Alternate row traversal direction
-        ordered_points = []
-        for i, row in enumerate(rows):
-            # Sort row points by x coordinate
-            row.sort(key=lambda p: p[0])
-
-            # Alternate traversal direction
-            if i % 2 == 0:
-                ordered_points.extend(row)
-            else:
-                ordered_points.extend(reversed(row))
-
+        ordered_points = [stitch_points[i] for i in path]
         return ordered_points
-    '''
-    def join_stitch_points(self, action_log):
-    stitch_points = [(x, y) for x, y, cmd, _ in action_log if cmd == "STITCH"]
-    
-    if not stitch_points:
-        return []
-    
-    # Start with the first point
-    unvisited = set(range(len(stitch_points)))
-    path = [0]  # Start with the first point
-    unvisited.remove(0)
-    
-    while unvisited:
-        current = path[-1]
-        # Find the nearest unvisited point
-        nearest = min(unvisited, 
-                      key=lambda i: np.linalg.norm(np.array(stitch_points[current]) - np.array(stitch_points[i])))
-        
-        path.append(nearest)
-        unvisited.remove(nearest)
-    
-    ordered_points = [stitch_points[i] for i in path]
-    return ordered_points
-    '''
+
     def plot_connected_stitches(self, ordered_points):
         plt.figure(figsize=(10, 10))
 
