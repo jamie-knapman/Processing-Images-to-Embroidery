@@ -393,21 +393,34 @@ class Screen4(QMainWindow):
         # All checkboxes for each colour
         self.red1 = self.findChild(QCheckBox, "red1")
         self.red2 = self.findChild(QCheckBox, "red2")
-        self.yellow = self.findChild(QCheckBox, "yellow")
         self.orange = self.findChild(QCheckBox, "orange")
+        self.yellow = self.findChild(QCheckBox, "yellow")
+        self.light_yellow = self.findChild(QCheckBox, "light_yellow")
         self.lGreen = self.findChild(QCheckBox, "lGreen")
-        self.mGreen = self.findChild(QCheckBox, "mGreen")
+        self.green = self.findChild(QCheckBox, "green")
         self.dGreen = self.findChild(QCheckBox, "dGreen")
         self.cyan = self.findChild(QCheckBox, "cyan")
+        self.light_cyan = self.findChild(QCheckBox, "light_cyan")
         self.teal = self.findChild(QCheckBox, "teal")
         self.lBlue = self.findChild(QCheckBox, "lBlue")
-        self.mBlue = self.findChild(QCheckBox, "mBlue")
+        self.blue = self.findChild(QCheckBox, "blue")
+        self.blue2 = self.findChild(QCheckBox, "blue2")
         self.dBlue = self.findChild(QCheckBox, "dBlue")
         self.purple = self.findChild(QCheckBox, "purple")
         self.magenta = self.findChild(QCheckBox, "magenta")
+        self.pink = self.findChild(QCheckBox, "pink")
         self.black = self.findChild(QCheckBox, "black")
         self.gray = self.findChild(QCheckBox, "gray")
         self.white = self.findChild(QCheckBox, "white")
+        self.brown = self.findChild(QCheckBox, "brown")
+        self.beige = self.findChild(QCheckBox, "beige")
+        self.maroon = self.findChild(QCheckBox, "maroon")
+        self.olive = self.findChild(QCheckBox, "olive")
+        self.turquoise = self.findChild(QCheckBox, "turquoise")
+        self.indigo = self.findChild(QCheckBox, "indigo")
+        self.lavender = self.findChild(QCheckBox, "lavender")
+        self.peach = self.findChild(QCheckBox, "peach")
+        self.tan = self.findChild(QCheckBox, "tan")
 
         # arrays and dicts for segmented images and each chosen bridge
         self.segmented_images = {}
@@ -444,25 +457,37 @@ class Screen4(QMainWindow):
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
         # Define colours
-        # TODO broaden scope
         color_ranges = {
-            "red": [(0, 100, 50), (10, 255, 255)],
-            "red2": [(170, 100, 50), (180, 255, 255)],
-            "yellow": [(20, 100, 100), (40, 255, 255)],
-            "orange": [(10, 100, 100), (25, 255, 255)],
-            "light_green": [(40, 50, 100), (70, 255, 255)],
-            "medium_green": [(70, 50, 50), (90, 255, 200)],
-            "dark_green": [(90, 50, 50), (110, 255, 150)],
-            "cyan": [(90, 50, 50), (110, 255, 255)],
-            "teal": [(80, 50, 100), (100, 255, 255)],
-            "light_blue": [(90, 50, 150), (110, 255, 255)],
-            "medium_blue": [(110, 50, 100), (130, 255, 255)],
-            "dark_blue": [(130, 50, 50), (150, 255, 200)],
-            "purple": [(130, 50, 50), (160, 255, 255)],
-            "magenta": [(130, 50, 50), (160, 255, 255)],
-            "black": [(0, 0, 0), (180, 255, 50)],
-            "gray": [(0, 0, 50), (180, 50, 200)],
-            "white": [(0, 0, 200), (180, 55, 255)],
+            "red": [(0, 70, 50), (10, 255, 255)],
+            "red2" : [(160, 70, 50), (180, 255, 255)],
+            "orange": [(11, 100, 100), (25, 255, 255)],
+            "yellow": [(26, 100, 100), (35, 255, 255)],
+            "light_yellow": [(36, 30, 100), (50, 255, 255)],
+            "light_green": [(40, 30, 100), (70, 255, 255)],
+            "green": [(70, 30, 100), (85, 255, 255)],
+            "dark_green": [(86, 30, 50), (100, 255, 200)],
+            "cyan": [(85, 30, 100), (100, 255, 255)],
+            "light_cyan": [(101, 30, 100), (110, 255, 255)],
+            "teal": [(111, 30, 100), (130, 255, 255)],
+            "light_blue": [(131, 30, 100), (150, 255, 255)],
+            "blue": [(151, 30, 100), (170, 255, 255)],
+            "blue2" : [(0, 30, 50), (10, 255, 200)],
+            "dark_blue": [(171, 30, 50), (180, 255, 200)],
+            "purple": [(120, 30, 50), (140, 255, 255)],
+            "magenta": [(141, 30, 50), (160, 255, 255)],
+            "pink": [(161, 30, 100), (170, 255, 255)],
+            "black": [(0, 0, 0), (180, 255, 30)],
+            "gray": [(0, 0, 31), (180, 30, 200)],
+            "white": [(0, 0, 201), (180, 30, 255)],
+            "brown": [(10, 50, 20), (20, 255, 200)],
+            "beige": [(21, 30, 100), (30, 150, 255)],
+            "maroon": [(0, 50, 20), (10, 255, 100)],
+            "olive": [(25, 30, 20), (35, 255, 100)],
+            "turquoise": [(80, 30, 100), (90, 255, 255)],
+            "indigo": [(110, 30, 20), (130, 255, 150)],
+            "lavender": [(130, 30, 100), (150, 255, 255)],
+            "peach": [(10, 30, 100), (20, 255, 255)],
+            "tan": [(20, 30, 100), (30, 255, 200)],
         }
 
         # Min pixels needed to segment colours
@@ -496,42 +521,68 @@ class Screen4(QMainWindow):
             else:
                 print(f"Skipped: {name} (Only {non_black_pixels} pixels)")
 
-        # Enable checkboxes for foumd colours
-        for i in range(len(mainColours)):
-            if mainColours[i] == "red":
+        for color in mainColours:
+            if color == "red":
                 self.red1.setEnabled(True)
-            if mainColours[i] == "red2":
+            elif color == "red2":
                 self.red2.setEnabled(True)
-            if mainColours[i] == "yellow":
-                self.yellow.setEnabled(True)
-            if mainColours[i] == "orange":
+            elif color == "orange":
                 self.orange.setEnabled(True)
-            if mainColours[i] == "light_green":
+            elif color == "yellow":
+                self.yellow.setEnabled(True)
+            elif color == "light_yellow":
+                self.light_yellow.setEnabled(True)
+            elif color == "light_green":
                 self.lGreen.setEnabled(True)
-            if mainColours[i] == "medium_green":
-                self.mGreen.setEnabled(True)
-            if mainColours[i] == "dark_green":
+            elif color == "green":
+                self.green.setEnabled(True)
+            elif color == "dark_green":
                 self.dGreen.setEnabled(True)
-            if mainColours[i] == "cyan":
+            elif color == "cyan":
                 self.cyan.setEnabled(True)
-            if mainColours[i] == "teal":
+            elif color == "light_cyan":
+                self.light_cyan.setEnabled(True)
+            elif color == "teal":
                 self.teal.setEnabled(True)
-            if mainColours[i] == "light_blue":
+            elif color == "light_blue":
                 self.lBlue.setEnabled(True)
-            if mainColours[i] == "medium_blue":
+            elif color == "blue":
                 self.mBlue.setEnabled(True)
-            if mainColours[i] == "dark_blue":
+            elif color == "blue2":
+                self.blue2.setEnabled(True)
+            elif color == "dark_blue":
                 self.dBlue.setEnabled(True)
-            if mainColours[i] == "purple":
+            elif color == "purple":
                 self.purple.setEnabled(True)
-            if mainColours[i] == "magenta":
+            elif color == "magenta":
                 self.magenta.setEnabled(True)
-            if mainColours[i] == "black":
+            elif color == "pink":
+                self.pink.setEnabled(True)
+            elif color == "black":
                 self.black.setEnabled(True)
-            if mainColours[i] == "gray":
+            elif color == "gray":
                 self.gray.setEnabled(True)
-            if mainColours[i] == "white":
+            elif color == "white":
                 self.white.setEnabled(True)
+            elif color == "brown":
+                self.brown.setEnabled(True)
+            elif color == "beige":
+                self.beige.setEnabled(True)
+            elif color == "maroon":
+                self.maroon.setEnabled(True)
+            elif color == "olive":
+                self.olive.setEnabled(True)
+            elif color == "turquoise":
+                self.turquoise.setEnabled(True)
+            elif color == "indigo":
+                self.indigo.setEnabled(True)
+            elif color == "lavender":
+                self.lavender.setEnabled(True)
+            elif color == "peach":
+                self.peach.setEnabled(True)
+            elif color == "tan":
+                self.tan.setEnabled(True)
+        print("Checkboxes enabled for:", mainColours)
 
     def reconstructImg(self):
         imgPath = self.screen1.global_image
@@ -545,11 +596,15 @@ class Screen4(QMainWindow):
         selected_colors = []
 
         checkboxes = {
-            "red": self.red1, "red2": self.red2, "yellow": self.yellow, "orange": self.orange,
-            "light_green": self.lGreen, "medium_green": self.mGreen, "dark_green": self.dGreen,
-            "cyan": self.cyan, "teal": self.teal, "light_blue": self.lBlue, "medium_blue": self.mBlue,
+            "red": self.red1, "red2": self.red2, "orange": self.orange, "yellow": self.yellow,
+            "light_yellow": self.light_yellow, "light_green": self.lGreen, "green": self.green,
+            "dark_green": self.dGreen, "cyan": self.cyan, "light_cyan": self.light_cyan,
+            "teal": self.teal, "light_blue": self.lBlue, "blue": self.mBlue, "blue2": self.blue2,
             "dark_blue": self.dBlue, "purple": self.purple, "magenta": self.magenta,
-            "black": self.black, "gray": self.gray, "white": self.white,
+            "pink": self.pink, "black": self.black, "gray": self.gray, "white": self.white,
+            "brown": self.brown, "beige": self.beige, "maroon": self.maroon, "olive": self.olive,
+            "turquoise": self.turquoise, "indigo": self.indigo, "lavender": self.lavender,
+            "peach": self.peach, "tan": self.tan,
         }
 
         for name, checkbox in checkboxes.items():
@@ -580,11 +635,15 @@ class Screen4(QMainWindow):
         selected_colors = []
 
         checkboxes = {
-            "red": self.red1, "red2": self.red2, "yellow": self.yellow, "orange": self.orange,
-            "light_green": self.lGreen, "medium_green": self.mGreen, "dark_green": self.dGreen,
-            "cyan": self.cyan, "teal": self.teal, "light_blue": self.lBlue, "medium_blue": self.mBlue,
+            "red": self.red1, "red2": self.red2, "orange": self.orange, "yellow": self.yellow,
+            "light_yellow": self.light_yellow, "light_green": self.lGreen, "green": self.green,
+            "dark_green": self.dGreen, "cyan": self.cyan, "light_cyan": self.light_cyan,
+            "teal": self.teal, "light_blue": self.lBlue, "blue": self.mBlue, "blue2": self.blue2,
             "dark_blue": self.dBlue, "purple": self.purple, "magenta": self.magenta,
-            "black": self.black, "gray": self.gray, "white": self.white,
+            "pink": self.pink, "black": self.black, "gray": self.gray, "white": self.white,
+            "brown": self.brown, "beige": self.beige, "maroon": self.maroon, "olive": self.olive,
+            "turquoise": self.turquoise, "indigo": self.indigo, "lavender": self.lavender,
+            "peach": self.peach, "tan": self.tan,
         }
 
         for name, checkbox in checkboxes.items():
