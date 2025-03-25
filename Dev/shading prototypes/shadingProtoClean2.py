@@ -138,94 +138,94 @@ class Screen3(QMainWindow):
                 print("Invalid input. Using default threshold (6).")
                 return 6
 
-    # Auto find edges function
+    #Auto find edges function
     def vectorise(self):
-        # Prevents crashes
+        #Prevents crashes
         try:
-            # Obtain threshold, define a scale factor and max stitch length
+            #Obtain threshold, define a scale factor and max stitch length
             smallthresh = self.get_small_thresh()
-            scale_factor = 2.0
+            scale_factor = 1.0
             max_stitch_length = 10.0
 
-            # Obtain image through screen1 TODO change this condition
+            #Obtain image through screen1 TODO change this condition
             image_path = self.screen1.global_image
 
-            # Read image into grey scale
+            #Read image into grey scale
             image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-            # Set next button as enabled TODO move just incase errors are made
+            #Set next button as enabled TODO move just incase errors are made
             self.nextButton.setEnabled(True)
 
-            # Canny Edge detection
+            #Canny Edge detection
             edges = cv2.Canny(image, 50, 150)
-            # Pull contours using Tree, seems to work best
+            #Pull contours using Tree, seems to work best
             contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-            # Create a blank canvas the same size as original image and draw found edges, Black and White
+            #Create a blank canvas the same size as original image and draw found edges, Black and White
             contour_image = np.zeros_like(image)
             cv2.drawContours(contour_image, contours, -1, (255, 255, 255), 1)
 
-            # Save image as edges output
+            #Save image as edges output
             edge_image_path = "edges_output.png"
             cv2.imwrite(edge_image_path, contour_image)
 
-            # Embroidery fileName for outlines #TODO change eventually
+            #Embroidery fileName for outlines #TODO change eventually
             outfile = "emb1"
 
             pattern = self.writeStitches(contours, smallthresh, scale_factor, image, max_stitch_length)
-            # Write .pes and .png files for p1
+            #Write .pes and .png files for p1
             pe.write_pes(pattern, f"{outfile}.pes")
             pe.write_png(pattern, f"{outfile}.png")
 
-            # Load emb1.png into image frame on UI
+            #Load emb1.png into image frame on UI
             pixmap = QPixmap(f"{outfile}.png")
             pixmap = pixmap.scaled(300, 200, Qt.AspectRatioMode.KeepAspectRatio)
             self.imageLabel.setPixmap(pixmap)
             self.imageLabel.setScaledContents(True)
 
         except Exception as e:
-            # Error handling and crash prevention
+            #Error handling and crash prevention
             print(f"An error occurred: {e}")
 
     def cannyTrackbars(self):
-        # Set global image to local path
+        #Set global image to local path
         image_path = self.screen1.global_image
 
-        # Read the image
+        #Read the image
         image = cv2.imread(image_path)
 
-        # Gray and blur
+        #Gray and blur
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         blurred = cv2.GaussianBlur(gray, (5, 5), 1.4)
 
-        # Enable track bars
+        #Enable track bars
         self.lowThresh.setEnabled(True)
         self.highThresh.setEnabled(True)
 
-        # Detect changes and update edges
+        #Detect changes and update edges
         self.lowThresh.valueChanged.connect(lambda: self.update_edges(blurred))
         self.highThresh.valueChanged.connect(lambda: self.update_edges(blurred))
         self.update_edges(blurred)
 
-        # Submit for finalising edge detection
+        #Submit for finalising edge detection
         self.submit = self.findChild(QPushButton, "Submit")
         if self.submit:
-            # Write the design
+            #Write the design
             self.submit.clicked.connect(lambda: self.writeManual())
         self.submit.setEnabled(True)
 
     def update_edges(self, blurred):
-        # Obtain values
+        #Obtain values
         low = self.lowThresh.value()
         high = self.highThresh.value()
 
-        # Obtain edges
+        #Obtain edges
         self.edges = cv2.Canny(blurred, low, high)
         edge_image_path = "edges_output.png"
 
-        # Write image
+        #Write image
         cv2.imwrite(edge_image_path, self.edges)
 
-        # Load image into frame TODO change this
+        #Load image into frame TODO change this
         pixmap = QPixmap(edge_image_path)
         if pixmap.isNull():
             print("Error: Failed to load the saved image.")
@@ -235,20 +235,20 @@ class Screen3(QMainWindow):
         self.imageLabel.setScaledContents(True)
 
     def writeManual(self):
-        # Define dependencies
+        #Define dependencies
         max_stitch_length = 10
         outfile = "emb1"
-        scale_factor = 2.0
+        scale_factor = 1.0
         smallthresh = self.get_small_thresh()
         image = cv2.imread("edges_output.png", cv2.IMREAD_GRAYSCALE)
         contours = self.readImg(image)
-        # Get pattern
+        #Get pattern
         pattern = self.writeStitches(contours, smallthresh, scale_factor, image, max_stitch_length)
-        # Write files
+        #Write files
         pe.write_pes(pattern, f"{outfile}.pes")
         pe.write_png(pattern, f"{outfile}.png")
 
-        # Load to label TODO change this
+        #Load to label TODO change this
         pixmap = QPixmap(f"{outfile}.png")
         if pixmap.isNull():
             print("Error: Failed to load the saved image.")
@@ -271,25 +271,25 @@ class Screen3(QMainWindow):
         return contours
 
     def writeStitches(self, contours, smallthresh, scale_factor, image, max_stitch_length):
-        # Create the Pattern as p1
+        #Create the Pattern as p1
         p1 = pe.EmbPattern()
 
-        # The path of each contour found in the image
+        #The path of each contour found in the image
         contour_paths = []
         for c in contours:
-            # Each contour must exceed the threshold
+            #Each contour must exceed the threshold
             if len(c) < smallthresh:
                 continue
 
-            # Define all stitches needed to make that contour
+            #Define all stitches needed to make that contour
             stitches = [(pt[0][0] * scale_factor, pt[0][1] * scale_factor) for pt in c]
-            # Add stitches to the paths
+            #Add stitches to the paths
             contour_paths.append(stitches)
 
-        # This section is preventing the "bounding box problem" allowing the full image to be displayed
-        # Define the height and width of the image
+        #This section is preventing the "bounding box problem" allowing the full image to be displayed
+        #Define the height and width of the image
         height, width = image.shape
-        # Define all corners of the image
+        #Define all corners of the image
         corner_stitches = [
             (0, 0),
             (width * scale_factor, 0),
@@ -297,11 +297,11 @@ class Screen3(QMainWindow):
             (0, height * scale_factor)
         ]
 
-        # Stitches need to be organised to prevent unnesscary jumping
+        #Stitches need to be organised to prevent unnesscary jumping
         ordered_stitches = []
         current_pos = (0, 0)
 
-        # Jump between all corners and make a stitch, not visible on final design just defining extremes
+        #Jump between all corners and make a stitch, not visible on final design just defining extremes
         for corner in corner_stitches:
             ordered_stitches.append((corner[0], corner[1], "JUMP"))
             ordered_stitches.append((corner[0], corner[1]))
@@ -324,11 +324,11 @@ class Screen3(QMainWindow):
         '''
 
         while contour_paths:
-            # Find th closest contour to the current position
-            # converts each contour position path[0] and currentpos into numoy arrays and calculates the distnace between the returning th min
+            #Find th closest contour to the current position
+            #converts each contour position path[0] and currentpos into numoy arrays and calculates the distnace between the returning th min
             next_contour = min(contour_paths,
                                key=lambda path: np.linalg.norm(np.array(path[0]) - np.array(current_pos)))
-            # remove since not using anymore
+            #remove since not using anymore
             contour_paths.remove(next_contour)
 
             if ordered_stitches:
@@ -338,7 +338,7 @@ class Screen3(QMainWindow):
             current_pos = next_contour[-1]
 
         stitches = 0
-        # Add stitches in array to the pattern where if the stitch is ended it jumps otherwise it moves to other stitch
+        #Add stitches in array to the pattern where if the stitch is ended it jumps otherwise it moves to other stitch
         for stitch in ordered_stitches:
             if isinstance(stitch, tuple) and len(stitch) == 3 and stitch[2] == "JUMP":
                 p1.add_stitch_absolute(pe.JUMP, stitch[0], stitch[1])
@@ -347,7 +347,7 @@ class Screen3(QMainWindow):
                 p1.add_stitch_absolute(pe.STITCH, stitch[0], stitch[1])
                 stitches += 1
 
-        # End the pattern
+        #End the pattern
         p1.end()
         print("TOTAL Stitches")
         print(stitches)
@@ -358,39 +358,39 @@ class Screen3(QMainWindow):
         (x1, y1) = start_pt  # Stasrt point
         (x2, y2) = end_pt  # End point
         distance = math.hypot(x2 - x1, y2 - y1)  # Define the distance between start and end of long stitch
-        # Incorrect call to this function as dist < max len
+        #Incorrect call to this function as dist < max len
         if distance <= max_stitch_length:
             return [start_pt, end_pt]
-        # How many segments does this line need
+        #How many segments does this line need
         num_segments = int(math.ceil(distance / max_stitch_length))
         points = []
-        # Loop though and append all valid "points" to the array
+        #Loop though and append all valid "points" to the array
         for i in range(num_segments + 1):
             t = i / num_segments
             x = x1 + t * (x2 - x1)
             y = y1 + t * (y2 - y1)
             points.append((x, y))
-        # Return list of points
+        #Return list of points
         return points
 
 
-# Class for obtaining the shading of images
+#Class for obtaining the shading of images
 class Screen4(QMainWindow):
     def __init__(self, stacked_widget, screen1):
         super().__init__()
         self.stacked_widget = stacked_widget
         self.screen1 = screen1
 
-        # Load UI from .ui file
+        #Load UI from .ui file
         uic.loadUi("Shading2.ui", self)
         self.setFixedSize(800, 450)
 
-        # Button for segmenting the colours of the image
+        #Button for segmenting the colours of the image
         self.auto = self.findChild(QPushButton, "Auto")
         if self.auto:
             self.auto.clicked.connect(self.segmentColours)
 
-        # All checkboxes for each colour
+        #All checkboxes for each colour
         self.red1 = self.findChild(QCheckBox, "red1")
         self.red2 = self.findChild(QCheckBox, "red2")
         self.yellow = self.findChild(QCheckBox, "yellow")
@@ -409,27 +409,27 @@ class Screen4(QMainWindow):
         self.gray = self.findChild(QCheckBox, "gray")
         self.white = self.findChild(QCheckBox, "white")
 
-        # arrays and dicts for segmented images and each chosen bridge
+        #arrays and dicts for segmented images and each chosen bridge
         self.segmented_images = {}
         self.colourBridge = []
 
-        # Button for user to reconstruct the image
+        #Button for user to reconstruct the image
         self.reconstruct = self.findChild(QPushButton, "reconstruct")
         if self.reconstruct:
             self.reconstruct.clicked.connect(self.reconstructImg)
 
-        # Button for generating the final shading patterns
+        #Button for generating the final shading patterns
         self.generate = self.findChild(QPushButton, "generate")
         if self.generate:
             self.generate.clicked.connect(self.generateImg)
 
-        # Reconstruct the final image
+        #Reconstruct the final image
         self.finalise = self.findChild(QPushButton, "finalise")
         if self.finalise:
             self.finalise.clicked.connect(self.reconstructGenImg)
 
     def segmentColours(self):
-        # Make sure this function can see the image from the start
+        #Make sure this function can see the image from the start
         if not hasattr(self.screen1, "global_image") or not self.screen1.global_image:
             print("Error: No image loaded.")
             return
@@ -440,11 +440,11 @@ class Screen4(QMainWindow):
             print("Error: Unable to read the image.")
             return
 
-        # Load the image into the BGR space
+        #Load the image into the BGR space
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-        # Define colours
-        # TODO broaden scope
+        #Define colours
+        #TODO broaden scope
         color_ranges = {
             "red": [(0, 100, 50), (10, 255, 255)],
             "red2": [(170, 100, 50), (180, 255, 255)],
@@ -653,61 +653,23 @@ class Screen4(QMainWindow):
         if not stitch_points:
             return []
 
-        # Group points by rows
-        stitch_points.sort(key=lambda p: p[1])  # Sort by Y coordinate
+        #Start with the first point
+        unvisited = set(range(len(stitch_points)))
+        path = [0]  #Start with the first point
+        unvisited.remove(0)
 
-        # Create rows
-        rows = []
-        current_row = []
-        current_y = stitch_points[0][1]
+        while unvisited:
+            current = path[-1]
+            #Find the nearest unvisited point
+            nearest = min(unvisited,
+                          key=lambda i: np.linalg.norm(np.array(stitch_points[current]) - np.array(stitch_points[i])))
 
-        for point in stitch_points:
-            if abs(point[1] - current_y) > 10:  # Threshold for new row
-                rows.append(current_row)
-                current_row = []
-                current_y = point[1]
-            current_row.append(point)
+            path.append(nearest)
+            unvisited.remove(nearest)
 
-        if current_row:
-            rows.append(current_row)
-
-        # Alternate row traversal direction
-        ordered_points = []
-        for i, row in enumerate(rows):
-            # Sort row points by x coordinate
-            row.sort(key=lambda p: p[0])
-
-            # Alternate traversal direction
-            if i % 2 == 0:
-                ordered_points.extend(row)
-            else:
-                ordered_points.extend(reversed(row))
-
+        ordered_points = [stitch_points[i] for i in path]
         return ordered_points
-    '''
-    def join_stitch_points(self, action_log):
-    stitch_points = [(x, y) for x, y, cmd, _ in action_log if cmd == "STITCH"]
-    
-    if not stitch_points:
-        return []
-    
-    # Start with the first point
-    unvisited = set(range(len(stitch_points)))
-    path = [0]  # Start with the first point
-    unvisited.remove(0)
-    
-    while unvisited:
-        current = path[-1]
-        # Find the nearest unvisited point
-        nearest = min(unvisited, 
-                      key=lambda i: np.linalg.norm(np.array(stitch_points[current]) - np.array(stitch_points[i])))
-        
-        path.append(nearest)
-        unvisited.remove(nearest)
-    
-    ordered_points = [stitch_points[i] for i in path]
-    return ordered_points
-    '''
+
     def plot_connected_stitches(self, ordered_points):
         plt.figure(figsize=(10, 10))
 
@@ -794,10 +756,10 @@ class Screen4(QMainWindow):
 
         pattern = pe.EmbPattern()
         max_jump_length = max_jump_length_factor * max_stitch_length
-        # This section is preventing the "bounding box problem" allowing the full image to be displayed
-        # Define the height and width of the image
+        #This section is preventing the "bounding box problem" allowing the full image to be displayed
+        #Define the height and width of the image
         h1, w1 = mask.shape  # Use mask instead of image
-        # Define all corners of the image
+        #Define all corners of the image
         corner_stitches = [
             (0, 0),
             (w1 * scale_factor, 0),
@@ -805,11 +767,11 @@ class Screen4(QMainWindow):
             (0, h1 * scale_factor)
         ]
 
-        # Jump between all corners and make a stitch, not visible on final design just defining extremes
+        #Jump between all corners and make a stitch, not visible on final design just defining extremes
         for corner in corner_stitches:
-            # Jump to the corner
+            #Jump to the corner
             pattern.add_stitch_absolute(pe.JUMP, corner[0], corner[1])
-            # Make a stitch at the corner
+            #Make a stitch at the corner
             pattern.add_stitch_absolute(pe.STITCH, corner[0], corner[1])
 
 
