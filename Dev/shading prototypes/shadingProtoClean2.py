@@ -653,12 +653,61 @@ class Screen4(QMainWindow):
         if not stitch_points:
             return []
 
-        mst = self.build_mst(stitch_points)
-        path_indices = self.traverse_mst(mst)
+        # Group points by rows
+        stitch_points.sort(key=lambda p: p[1])  # Sort by Y coordinate
 
-        ordered_points = [stitch_points[i] for i in path_indices]
+        # Create rows
+        rows = []
+        current_row = []
+        current_y = stitch_points[0][1]
+
+        for point in stitch_points:
+            if abs(point[1] - current_y) > 10:  # Threshold for new row
+                rows.append(current_row)
+                current_row = []
+                current_y = point[1]
+            current_row.append(point)
+
+        if current_row:
+            rows.append(current_row)
+
+        # Alternate row traversal direction
+        ordered_points = []
+        for i, row in enumerate(rows):
+            # Sort row points by x coordinate
+            row.sort(key=lambda p: p[0])
+
+            # Alternate traversal direction
+            if i % 2 == 0:
+                ordered_points.extend(row)
+            else:
+                ordered_points.extend(reversed(row))
+
         return ordered_points
-
+    '''
+    def join_stitch_points(self, action_log):
+    stitch_points = [(x, y) for x, y, cmd, _ in action_log if cmd == "STITCH"]
+    
+    if not stitch_points:
+        return []
+    
+    # Start with the first point
+    unvisited = set(range(len(stitch_points)))
+    path = [0]  # Start with the first point
+    unvisited.remove(0)
+    
+    while unvisited:
+        current = path[-1]
+        # Find the nearest unvisited point
+        nearest = min(unvisited, 
+                      key=lambda i: np.linalg.norm(np.array(stitch_points[current]) - np.array(stitch_points[i])))
+        
+        path.append(nearest)
+        unvisited.remove(nearest)
+    
+    ordered_points = [stitch_points[i] for i in path]
+    return ordered_points
+    '''
     def plot_connected_stitches(self, ordered_points):
         plt.figure(figsize=(10, 10))
 
@@ -782,125 +831,54 @@ class Screen4(QMainWindow):
         self.plot_connected_stitches(ordered_points)
 
         return pattern #Return the properly ordered embroidery pattern
-
-
     '''
-    def contours_to_embroidery_with_bridging(self, image_path, bridge_spacing, scale_factor):
-        #ORIGINAL
-        max_stitch_length = 10
-
-        def subdivide_segment(start_pt, end_pt, max_stitch_length):
-            (x1, y1) = start_pt
-            (x2, y2) = end_pt
-            distance = math.hypot(x2 - x1, y2 - y1)
-            if distance <= max_stitch_length:
-                return [start_pt, end_pt]
-            num_segments = int(math.ceil(distance / max_stitch_length))
-            points = []
-            for i in range(num_segments + 1):
-                t = i / num_segments
-                x = x1 + t * (x2 - x1)
-                y = y1 + t * (y2 - y1)
-                points.append((x, y))
-            return points
-
-        print(f"Processing image: {image_path}")
-
-        image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-        if image is None:
-            print("Error: Unable to load image.")
-            return None
-        height, width = image.shape
-
-        edges = cv2.Canny(image, 50, 150)
-        contours, hierarchy = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        if not contours:
-            print("Error: No contours detected.")
-            return None
-        print(f"Contours found: {len(contours)}")
-
-        hierarchy = hierarchy[0]
-
-
-        pattern = pe.EmbPattern()
-
-        corner_points = [
-            (0, 0),
-            (width * scale_factor, 0),
-            (width * scale_factor, height * scale_factor),
-            (0, height * scale_factor)
-        ]
-
-        for corner in corner_points:
-            pattern.add_stitch_absolute(pe.JUMP, corner[0], corner[1])
-            pattern.add_stitch_absolute(pe.STITCH, corner[0], corner[1])
+    ordered_points = self.join_stitch_points(action_log)
+    
+    pattern = pe.EmbPattern()
+    max_jump_length = max_jump_length_factor * max_stitch_length
+    
+    for i, (x, y) in enumerate(ordered_points):
+        if i == 0:
+            pattern.add_stitch_absolute(pe.JUMP, x, y)
+        else:
+            prev_x, prev_y = ordered_points[i - 1]
+            jump_distance = math.hypot(prev_x - x, prev_y - y)
+            
+            # Implement a more intelligent jumping strategy
+            if jump_distance > max_jump_length:
+                # Find the closest point in the previous or next few points
+                look_ahead = min(5, len(ordered_points) - i)
+                look_behind = min(5, i)
+                
+                # Check nearby points for shorter jumps
+                shortest_jump = jump_distance
+                best_point_index = i
+                
+                for j in range(1, look_ahead):
+                    if i + j < len(ordered_points):
+                        alt_jump = math.hypot(prev_x - ordered_points[i+j][0], 
+                                              prev_y - ordered_points[i+j][1])
+                        if alt_jump < shortest_jump:
+                            shortest_jump = alt_jump
+                            best_point_index = i + j
+                
+                for j in range(1, look_behind):
+                    if i - j >= 0:
+                        alt_jump = math.hypot(prev_x - ordered_points[i-j][0], 
+                                              prev_y - ordered_points[i-j][1])
+                        if alt_jump < shortest_jump:
+                            shortest_jump = alt_jump
+                            best_point_index = i - j
+                
+                # Jump to the point with the shortest jump
+                pattern.add_command(pe.TRIM)
+                pattern.add_stitch_absolute(pe.JUMP, ordered_points[best_point_index][0], 
+                                            ordered_points[best_point_index][1])
+            
+            pattern.add_stitch_absolute(pe.STITCH, x, y)
+    '''
 
 
-        for idx, contour in enumerate(contours):
-
-
-            if hierarchy[idx][3] != -1:
-                print(f"Skipping inner (hole) contour idx {idx}. and coordinate {contour}")
-                continue
-
-            x, y, w, h = cv2.boundingRect(contour)
-            print(f"Processing outer contour idx {idx} at (x={x}, y={y}, w={w}, h={h}); points: {len(contour)}")
-
-
-            start_pt = contour[0][0]
-            start_scaled = (start_pt[0] * scale_factor, start_pt[1] * scale_factor)
-            pattern.add_stitch_absolute(pe.JUMP, start_scaled[0], start_scaled[1])
-
-            previous_end = None
-            direction = True
-
-            for row in range(y, y + h, bridge_spacing):
-                scanline_points = []
-                if direction:
-                    scan_x_range = range(x, x + w)
-                else:
-                    scan_x_range = range(x + w - 1, x - 1, -1)
-
-                for col in scan_x_range:
-                    if cv2.pointPolygonTest(contour, (col, row), False) >= 0:
-                        scanline_points.append((col, row))
-                if not scanline_points:
-                    direction = not direction
-                    continue
-
-                segment_start = None
-                for i in range(len(scanline_points) - 1):
-                    if segment_start is None:
-                        segment_start = scanline_points[i]
-                    if scanline_points[i + 1][0] - scanline_points[i][0] > 1:
-                        segment_end = scanline_points[i]
-                        if segment_start != segment_end:
-                            first_scaled = (segment_start[0] * scale_factor, segment_start[1] * scale_factor)
-                            last_scaled = (segment_end[0] * scale_factor, segment_end[1] * scale_factor)
-                            if previous_end:
-                                pattern.add_stitch_absolute(pe.JUMP, previous_end[0], previous_end[1])
-                            stitch_points = subdivide_segment(first_scaled, last_scaled, max_stitch_length)
-                            for pt in stitch_points:
-                                pattern.add_stitch_absolute(pe.STITCH, pt[0], pt[1])
-                            previous_end = stitch_points[-1]
-                        segment_start = None
-
-                if segment_start:
-                    segment_end = scanline_points[-1]
-                    first_scaled = (segment_start[0] * scale_factor, segment_start[1] * scale_factor)
-                    last_scaled = (segment_end[0] * scale_factor, segment_end[1] * scale_factor)
-                    if previous_end:
-                        pattern.add_stitch_absolute(pe.JUMP, previous_end[0], previous_end[1])
-                    stitch_points = subdivide_segment(first_scaled, last_scaled, max_stitch_length)
-                    for pt in stitch_points:
-                        pattern.add_stitch_absolute(pe.STITCH, pt[0], pt[1])
-                    previous_end = stitch_points[-1]
-                direction = not direction
-
-        pattern.end()
-        print("Embroidery pattern generated.")
-        return pattern
-        '''
 
     def reconstructGenImg(self):
         print("Selected Colors:", self.colourBridge)
