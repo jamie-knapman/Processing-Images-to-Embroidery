@@ -281,14 +281,22 @@ class Screen3(QMainWindow):
             if len(c) < smallthresh:
                 continue
 
-            # Define all stitches needed to make that contour
-            stitches = [(pt[0][0] * scale_factor, pt[0][1] * scale_factor) for pt in c]
-            # Add stitches to the paths
+            # Define all stitches needed to make that contour with subdivisions
+            stitches = []
+            for i in range(len(c) - 1):
+                start_pt = (c[i][0][0] * scale_factor, c[i][0][1] * scale_factor)
+                end_pt = (c[i + 1][0][0] * scale_factor, c[i + 1][0][1] * scale_factor)
+
+                # Subdivide long segments
+                subdivided = self.subdivide_segment(start_pt, end_pt, max_stitch_length)
+                stitches.extend(subdivided[:-1])  # Exclude last point to prevent duplicates
+
+            stitches.append((c[-1][0][0] * scale_factor, c[-1][0][1] * scale_factor))  # Add last point
             contour_paths.append(stitches)
 
-        # This section is preventing the "bounding box problem" allowing the full image to be displayed
         # Define the height and width of the image
         height, width = image.shape
+
         # Define all corners of the image
         corner_stitches = [
             (0, 0),
@@ -297,38 +305,19 @@ class Screen3(QMainWindow):
             (0, height * scale_factor)
         ]
 
-        # Stitches need to be organised to prevent unnesscary jumping
+        # Stitches need to be organized to prevent unnecessary jumps
         ordered_stitches = []
         current_pos = (0, 0)
 
-        # Jump between all corners and make a stitch, not visible on final design just defining extremes
+        # Jump between all corners and make a stitch, defining the bounding box
         for corner in corner_stitches:
             ordered_stitches.append((corner[0], corner[1], "JUMP"))
             ordered_stitches.append((corner[0], corner[1]))
-        '''
-        for contour in contour_paths:
-            # If ordered stitches exists, add the contour to it
-            if ordered_stitches:
-                ordered_stitches.append((contour[0][0], contour[0][1], "JUMP"))
-
-            # Add each subdivided segment to ordered stitches
-            for i in range(len(contour) - 1):
-                start_stitch = contour[i]
-                end_stitch = contour[i + 1]
-
-                subdivided_stitches = self.subdivide_segment(start_stitch, end_stitch, max_stitch_length)
-                for stitch in subdivided_stitches:
-                    ordered_stitches.append((stitch[0], stitch[1]))
-
-
-        '''
 
         while contour_paths:
-            # Find th closest contour to the current position
-            # converts each contour position path[0] and currentpos into numoy arrays and calculates the distnace between the returning th min
+            # Find the closest contour to the current position
             next_contour = min(contour_paths,
                                key=lambda path: np.linalg.norm(np.array(path[0]) - np.array(current_pos)))
-            # remove since not using anymore
             contour_paths.remove(next_contour)
 
             if ordered_stitches:
@@ -338,7 +327,7 @@ class Screen3(QMainWindow):
             current_pos = next_contour[-1]
 
         stitches = 0
-        # Add stitches in array to the pattern where if the stitch is ended it jumps otherwise it moves to other stitch
+        # Add stitches to the pattern
         for stitch in ordered_stitches:
             if isinstance(stitch, tuple) and len(stitch) == 3 and stitch[2] == "JUMP":
                 p1.add_stitch_absolute(pe.JUMP, stitch[0], stitch[1])
@@ -349,29 +338,19 @@ class Screen3(QMainWindow):
 
         # End the pattern
         p1.end()
-        print("TOTAL Stitches")
-        print(stitches)
+        print("TOTAL Stitches:", stitches)
         return p1
 
-    # Divide each "long stitch" into smaller segments based of max_stitch_length
     def subdivide_segment(self, start_pt, end_pt, max_stitch_length):
-        (x1, y1) = start_pt  # Stasrt point
-        (x2, y2) = end_pt  # End point
-        distance = math.hypot(x2 - x1, y2 - y1)  # Define the distance between start and end of long stitch
-        # Incorrect call to this function as dist < max len
+        (x1, y1) = start_pt
+        (x2, y2) = end_pt
+        distance = math.hypot(x2 - x1, y2 - y1)
+
         if distance <= max_stitch_length:
             return [start_pt, end_pt]
-        # How many segments does this line need
+
         num_segments = int(math.ceil(distance / max_stitch_length))
-        points = []
-        # Loop though and append all valid "points" to the array
-        for i in range(num_segments + 1):
-            t = i / num_segments
-            x = x1 + t * (x2 - x1)
-            y = y1 + t * (y2 - y1)
-            points.append((x, y))
-        # Return list of points
-        return points
+        return [(x1 + t * (x2 - x1), y1 + t * (y2 - y1)) for t in np.linspace(0, 1, num_segments + 1)]
 
 
 # Class for obtaining the shading of images
@@ -782,7 +761,8 @@ class Screen4(QMainWindow):
             "pink": self.pink, "black": self.black, "gray": self.gray, "white": self.white,
             "brown": self.brown, "beige": self.beige, "maroon": self.maroon, "olive": self.olive,
             "turquoise": self.turquoise, "indigo": self.indigo, "lavender": self.lavender,
-            "peach": self.peach, "tan": self.tan,
+            "peach": self.peach, "tan": self.tan, "combined1": self.combined1, "combined2": self.combined2,
+            "combined3": self.combined3, "combined4": self.combined4,
         }
 
         for name, checkbox in checkboxes.items():
@@ -810,25 +790,6 @@ class Screen4(QMainWindow):
                 print(f"Critical Error processing {img_file}: {e}")
                 continue
 
-    '''
-    # This section is preventing the "bounding box problem" allowing the full image to be displayed
-        # Define the height and width of the image
-        h1, w1 = mask.shape  # Use mask instead of image
-        # Define all corners of the image
-        corner_stitches = [
-            (0, 0),
-            (w1 * scale_factor, 0),
-            (w1 * scale_factor, h1 * scale_factor),
-            (0, h1 * scale_factor)
-        ]
-
-        # Jump between all corners and make a stitch, not visible on final design just defining extremes
-        for corner in corner_stitches:
-            # Jump to the corner
-            pattern.add_stitch_absolute(pe.JUMP, corner[0], corner[1])
-            # Make a stitch at the corner
-            pattern.add_stitch_absolute(pe.STITCH, corner[0], corner[1])
-            '''
 
     def build_mst(self, stitch_points):
         G = nx.Graph()
