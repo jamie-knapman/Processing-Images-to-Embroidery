@@ -27,7 +27,7 @@ class MainWindow(QMainWindow):
 
         # Load .ui file
         uic.loadUi("MainMenu2.ui", self)
-        self.setFixedSize(800, 450)  # TODO, Change this at some point so images are displayed correctly
+        self.setFixedSize(1200, 700)
 
         # Buttons for creating new and opening a saved Design
         self.button1 = self.findChild(QPushButton, "createNew")
@@ -45,7 +45,7 @@ class Screen1(QMainWindow):
 
         # Load the .ui for this window
         uic.loadUi("CreateNew2.ui", self)
-        self.setFixedSize(800, 450)  # TODO see MainWindow
+        self.setFixedSize(1200, 700)
 
         # Define buttons in the window
         self.backButton = self.findChild(QPushButton, "BackToMain")
@@ -91,7 +91,7 @@ class Screen3(QMainWindow):
 
         # Load from .ui file
         uic.loadUi("Edges2.ui", self)
-        self.setFixedSize(800, 450)  # TODO see MainWindow
+        self.setFixedSize(1200, 700)
 
         # Define UI features
         self.backButton = self.findChild(QPushButton, "BackToMain")
@@ -178,7 +178,7 @@ class Screen3(QMainWindow):
 
             # Load emb1.png into image frame on UI
             pixmap = QPixmap(f"{outfile}.png")
-            pixmap = pixmap.scaled(300, 200, Qt.AspectRatioMode.KeepAspectRatio)
+            pixmap = pixmap.scaled(801, 521, Qt.AspectRatioMode.KeepAspectRatio)
             self.imageLabel.setPixmap(pixmap)
             self.imageLabel.setScaledContents(True)
 
@@ -230,7 +230,7 @@ class Screen3(QMainWindow):
         if pixmap.isNull():
             print("Error: Failed to load the saved image.")
             return
-        pixmap = pixmap.scaled(300, 200, Qt.AspectRatioMode.KeepAspectRatio)
+        pixmap = pixmap.scaled(801, 521, Qt.AspectRatioMode.KeepAspectRatio)
         self.imageLabel.setPixmap(pixmap)
         self.imageLabel.setScaledContents(True)
 
@@ -253,7 +253,7 @@ class Screen3(QMainWindow):
         if pixmap.isNull():
             print("Error: Failed to load the saved image.")
             return
-        pixmap = pixmap.scaled(300, 200, Qt.AspectRatioMode.KeepAspectRatio)
+        pixmap = pixmap.scaled(801, 521, Qt.AspectRatioMode.KeepAspectRatio)
         self.imageLabel.setPixmap(pixmap)
         self.imageLabel.setScaledContents(True)
 
@@ -362,7 +362,8 @@ class Screen4(QMainWindow):
 
         # Load UI from .ui file
         uic.loadUi("Shading2.ui", self)
-        self.setFixedSize(800, 450)
+        self.setFixedSize(1200, 700)
+        self.imageLabel = self.findChild(QLabel, "imageLabel")
 
         # Button for segmenting the colours of the image
         self.auto = self.findChild(QPushButton, "Auto")
@@ -696,6 +697,20 @@ class Screen4(QMainWindow):
         if self.current_combination < len(combined_checkboxes):
             combined_checkboxes[self.current_combination].setEnabled(True)
 
+        if self.current_combination == 0:
+            pixmap = QPixmap("combined1.png")
+        if self.current_combination == 1:
+            pixmap = QPixmap("combined2.png")
+        if self.current_combination == 2:
+            pixmap = QPixmap("combined3.png")
+        if self.current_combination == 3:
+            pixmap = QPixmap("combined4.png")
+        if pixmap.isNull():
+            print("Error: Failed to load the saved image.")
+            return
+        pixmap = pixmap.scaled(801, 521, Qt.AspectRatioMode.KeepAspectRatio)
+        self.imageLabel.setPixmap(pixmap)
+        self.imageLabel.setScaledContents(True)
         self.current_combination += 1
 
 
@@ -742,6 +757,13 @@ class Screen4(QMainWindow):
 
         cv2.imwrite("reconstructed.png", reconstructed)
         print("Reconstructed image saved as reconstructed.png")
+        pixmap = QPixmap("reconstructed.png")
+        if pixmap.isNull():
+            print("Error: Failed to load the saved image.")
+            return
+        pixmap = pixmap.scaled(801, 521, Qt.AspectRatioMode.KeepAspectRatio)
+        self.imageLabel.setPixmap(pixmap)
+        self.imageLabel.setScaledContents(True)
 
     def generateImg(self):
         imgPath = self.screen1.global_image
@@ -829,18 +851,6 @@ class Screen4(QMainWindow):
         ordered_points = [stitch_points[i] for i in path]
         return ordered_points
 
-    def plot_connected_stitches(self, ordered_points):
-        plt.figure(figsize=(10, 10))
-
-        x_vals, y_vals = zip(*ordered_points)
-        plt.plot(x_vals, y_vals, marker="o", linestyle="-", color="blue")
-
-        plt.gca().invert_yaxis()
-        plt.xlabel("X Coordinate")
-        plt.ylabel("Y Coordinate")
-        plt.title("Connected Stitch Path (MST)")
-        plt.grid(True)
-        plt.show()
 
     def image_to_stitch_pattern(self, image_path, bridge_spacing, scale_factor, max_stitch_length, kernel_size):
         # Function to subdivide long stitch segments
@@ -945,57 +955,9 @@ class Screen4(QMainWindow):
 
         pattern.end()  # Finalize the pattern
 
-        # Plot the connected stitches
-        self.plot_connected_stitches(ordered_points)
 
         return pattern  # Return the properly ordered embroidery pattern
 
-    '''
-    ordered_points = self.join_stitch_points(action_log)
-
-    pattern = pe.EmbPattern()
-    max_jump_length = max_jump_length_factor * max_stitch_length
-
-    for i, (x, y) in enumerate(ordered_points):
-        if i == 0:
-            pattern.add_stitch_absolute(pe.JUMP, x, y)
-        else:
-            prev_x, prev_y = ordered_points[i - 1]
-            jump_distance = math.hypot(prev_x - x, prev_y - y)
-
-            # Implement a more intelligent jumping strategy
-            if jump_distance > max_jump_length:
-                # Find the closest point in the previous or next few points
-                look_ahead = min(5, len(ordered_points) - i)
-                look_behind = min(5, i)
-
-                # Check nearby points for shorter jumps
-                shortest_jump = jump_distance
-                best_point_index = i
-
-                for j in range(1, look_ahead):
-                    if i + j < len(ordered_points):
-                        alt_jump = math.hypot(prev_x - ordered_points[i+j][0], 
-                                              prev_y - ordered_points[i+j][1])
-                        if alt_jump < shortest_jump:
-                            shortest_jump = alt_jump
-                            best_point_index = i + j
-
-                for j in range(1, look_behind):
-                    if i - j >= 0:
-                        alt_jump = math.hypot(prev_x - ordered_points[i-j][0], 
-                                              prev_y - ordered_points[i-j][1])
-                        if alt_jump < shortest_jump:
-                            shortest_jump = alt_jump
-                            best_point_index = i - j
-
-                # Jump to the point with the shortest jump
-                pattern.add_command(pe.TRIM)
-                pattern.add_stitch_absolute(pe.JUMP, ordered_points[best_point_index][0], 
-                                            ordered_points[best_point_index][1])
-
-            pattern.add_stitch_absolute(pe.STITCH, x, y)
-    '''
 
     def reconstructGenImg(self):
         print("Selected Colors:", self.colourBridge)
