@@ -7,6 +7,7 @@ Made a fix for outline stitches (to be tested)
 ---Pending---
 improve UI through TODOs in code
 Finish commenting code
+background subtraction?
 
 ---Comments---
 Keep development until 4th due to testing restrictions
