@@ -1,0 +1,14 @@
+---Done---
+Shading algorithms work correctly
+Added colour combine in UI
+Made a fix for outline stitches (to be tested)
+
+
+---Pending---
+improve UI through TODOs in code
+Finish commenting code
+
+---Comments---
+Keep development until 4th due to testing restrictions
+Work on report in easter
+Nothing much to report due to shading refinements(see notebook for details)
