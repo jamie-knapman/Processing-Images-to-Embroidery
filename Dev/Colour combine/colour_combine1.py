@@ -70,16 +70,31 @@ class Screen1(QMainWindow):
     # Upload image function
     def upload_image(self):
         # Open file explorer and let user upload file path
-        file_path, _ = QFileDialog.getOpenFileName(self, "Open Image", "", "Images (*.png *.jpg *.jpeg *.bmp)")
+        file_pathOrg, _ = QFileDialog.getOpenFileName(self, "Open Image", "", "Images (*.png *.jpg *.jpeg *.bmp)")
 
-        # If filepath exists then set it "globally" and load it into the image frame in the UI then allow next to be pressed
-        if file_path:
-            self.global_image = file_path
-            self.pixmap = QPixmap(file_path)
-            self.imageLabel.setPixmap(self.pixmap)
-            self.imageLabel.setScaledContents(True)
-            self.NextButton.setEnabled(True)
-            print(f"Image loaded: {file_path}")
+        try:
+            img = cv2.imread(file_pathOrg)
+            height, width = img.shape[:2]
+            scale_factor = 2.0
+            new_width = int(width * scale_factor)
+            new_height = int(height * scale_factor)
+
+            resized = cv2.resize(img, (new_width, new_height), interpolation=cv2.INTER_LINEAR)
+
+            cv2.imwrite("resized.jpg", resized)
+
+            file_path = "resized.jpg"
+            # If filepath exists then set it "globally" and load it into the image frame in the UI then allow next to be pressed
+            if file_path:
+                self.global_image = file_path
+                self.pixmap = QPixmap(file_path)
+                self.imageLabel.setPixmap(self.pixmap)
+                self.imageLabel.setScaledContents(True)
+                self.NextButton.setEnabled(True)
+                print(f"Image loaded: {file_path}")
+        except Exception as e:
+            # Error handling and crash prevention
+            print(f"An error occurred: {e}")
 
 
 # Class for defining the outline of the image, user can do this manually or automatically.
@@ -144,7 +159,7 @@ class Screen3(QMainWindow):
         try:
             # Obtain threshold, define a scale factor and max stitch length
             smallthresh = self.get_small_thresh()
-            scale_factor = 2.0
+
             max_stitch_length = 10.0
 
             # Obtain image through screen1 TODO change this condition
@@ -171,7 +186,7 @@ class Screen3(QMainWindow):
             # Embroidery fileName for outlines #TODO change eventually
             outfile = "emb1"
 
-            pattern = self.writeStitches(contours, smallthresh, scale_factor, image, max_stitch_length)
+            pattern = self.writeStitches(contours, smallthresh, image, max_stitch_length)
             # Write .pes and .png files for p1
             pe.write_pes(pattern, f"{outfile}.pes")
             pe.write_png(pattern, f"{outfile}.png")
@@ -238,12 +253,11 @@ class Screen3(QMainWindow):
         # Define dependencies
         max_stitch_length = 10
         outfile = "emb1"
-        scale_factor = 2.0
         smallthresh = self.get_small_thresh()
         image = cv2.imread("edges_output.png", cv2.IMREAD_GRAYSCALE)
         contours = self.readImg(image)
         # Get pattern
-        pattern = self.writeStitches(contours, smallthresh, scale_factor, image, max_stitch_length)
+        pattern = self.writeStitches(contours, smallthresh, image, max_stitch_length)
         # Write files
         pe.write_pes(pattern, f"{outfile}.pes")
         pe.write_png(pattern, f"{outfile}.png")
@@ -270,7 +284,7 @@ class Screen3(QMainWindow):
 
         return contours
 
-    def writeStitches(self, contours, smallthresh, scale_factor, image, max_stitch_length):
+    def writeStitches(self, contours, smallthresh, image, max_stitch_length):
         # Create the Pattern as p1
         p1 = pe.EmbPattern()
 
@@ -284,14 +298,14 @@ class Screen3(QMainWindow):
             # Define all stitches needed to make that contour with subdivisions
             stitches = []
             for i in range(len(c) - 1):
-                start_pt = (c[i][0][0] * scale_factor, c[i][0][1] * scale_factor)
-                end_pt = (c[i + 1][0][0] * scale_factor, c[i + 1][0][1] * scale_factor)
+                start_pt = (c[i][0][0], c[i][0][1])
+                end_pt = (c[i + 1][0][0], c[i + 1][0][1])
 
                 # Subdivide long segments
                 subdivided = self.subdivide_segment(start_pt, end_pt, max_stitch_length)
                 stitches.extend(subdivided[:-1])  # Exclude last point to prevent duplicates
 
-            stitches.append((c[-1][0][0] * scale_factor, c[-1][0][1] * scale_factor))  # Add last point
+            stitches.append((c[-1][0][0], c[-1][0][1]))  # Add last point
             contour_paths.append(stitches)
 
         # Define the height and width of the image
@@ -300,9 +314,9 @@ class Screen3(QMainWindow):
         # Define all corners of the image
         corner_stitches = [
             (0, 0),
-            (width * scale_factor, 0),
-            (width * scale_factor, height * scale_factor),
-            (0, height * scale_factor)
+            (width, 0),
+            (width, height),
+            (0, height)
         ]
 
         # Stitches need to be organized to prevent unnecessary jumps
@@ -801,7 +815,7 @@ class Screen4(QMainWindow):
                 continue
 
             try:
-                pattern = self.image_to_stitch_pattern(img_file, 5, 1.0, 5, 3)
+                pattern = self.image_to_stitch_pattern(img_file, 5, 5, 3)
                 if pattern is None:
                     print(f"Warning: No valid pattern for {img_file}. Skipping.")
                     continue
@@ -852,7 +866,7 @@ class Screen4(QMainWindow):
         return ordered_points
 
 
-    def image_to_stitch_pattern(self, image_path, bridge_spacing, scale_factor, max_stitch_length, kernel_size):
+    def image_to_stitch_pattern(self, image_path, bridge_spacing, max_stitch_length, kernel_size):
         # Function to subdivide long stitch segments
         def subdivide_segment(start_pt, end_pt, max_stitch_length):
             (x1, y1) = start_pt
@@ -897,8 +911,8 @@ class Screen4(QMainWindow):
                         inside_shape = True
                 else:
                     if inside_shape and start_x is not None:
-                        first_scaled = (start_x * scale_factor, y * scale_factor)
-                        last_scaled = (x * scale_factor, y * scale_factor)
+                        first_scaled = (start_x, y)
+                        last_scaled = (x, y)
 
                         stitch_points = subdivide_segment(first_scaled, last_scaled, max_stitch_length)
                         for pt in stitch_points:
@@ -908,8 +922,8 @@ class Screen4(QMainWindow):
                         inside_shape = False
 
             if inside_shape and start_x is not None:
-                first_scaled = (start_x * scale_factor, y * scale_factor)
-                last_scaled = (width * scale_factor if direction else 0, y * scale_factor)
+                first_scaled = (start_x, y)
+                last_scaled = (width if direction else 0, y)
 
                 stitch_points = subdivide_segment(first_scaled, last_scaled, max_stitch_length)
                 for pt in stitch_points:
@@ -929,9 +943,9 @@ class Screen4(QMainWindow):
         # Define all corners of the image
         corner_stitches = [
             (0, 0),
-            (w1 * scale_factor, 0),
-            (w1 * scale_factor, h1 * scale_factor),
-            (0, h1 * scale_factor)
+            (w1, 0),
+            (w1, h1),
+            (0, h1)
         ]
 
         # Jump between all corners and make a stitch, not visible on final design just defining extremes
