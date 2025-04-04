@@ -75,7 +75,7 @@ class Screen1(QMainWindow):
         try:
             img = cv2.imread(file_pathOrg)
             height, width = img.shape[:2]
-            scale_factor = 2.0
+            scale_factor = 1.0
             new_width = int(width * scale_factor)
             new_height = int(height * scale_factor)
 
@@ -474,10 +474,7 @@ class Screen4(QMainWindow):
         if self.generate:
             self.generate.clicked.connect(self.generateImg)
 
-        # Reconstruct the final image
-        self.finalise = self.findChild(QPushButton, "finalise")
-        if self.finalise:
-            self.finalise.clicked.connect(self.reconstructGenImg)
+
 
     def segmentColours(self):
         # Make sure this function can see the image from the start
@@ -815,7 +812,7 @@ class Screen4(QMainWindow):
                 continue
 
             try:
-                pattern = self.image_to_stitch_pattern(img_file, 5, 5, 3)
+                pattern = self.image_to_stitch_pattern(img_file, 6, 5, 3)
                 if pattern is None:
                     print(f"Warning: No valid pattern for {img_file}. Skipping.")
                     continue
@@ -973,49 +970,6 @@ class Screen4(QMainWindow):
         return pattern  # Return the properly ordered embroidery pattern
 
 
-    def reconstructGenImg(self):
-        print("Selected Colors:", self.colourBridge)
-
-        # Load the original image to determine canvas size
-        imgPath = self.screen1.global_image
-        original = cv2.imread(imgPath)
-
-        if original is None:
-            print("Error: Unable to read the original image.")
-            return
-
-        # Create a blank canvas (white) with the same size as the original image
-        height, width = original.shape[:2]
-        reconstructed = np.ones((height, width, 3), dtype=np.uint8) * 255
-
-        try:
-            for name in self.colourBridge:
-                pes_path = os.path.join(f"{name}Bridge.pes")
-
-                # Load PES file
-                pattern = pe.read(pes_path)
-                if pattern is None:
-                    print(f"Error: Unable to read {pes_path}")
-                    continue
-
-                # Choose a color for this pattern (customize if needed)
-                color = (np.random.randint(0, 255), np.random.randint(0, 255), np.random.randint(0, 255))
-
-                # Draw stitches onto the image exactly as they are
-                for i in range(len(pattern.stitches) - 1):
-                    x1, y1, cmd1 = pattern.stitches[i]
-                    x2, y2, cmd2 = pattern.stitches[i + 1]
-
-                    # Only draw STITCH commands (ignore JUMP/TRIM commands)
-                    if cmd1 == pe.STITCH and cmd2 == pe.STITCH:
-                        cv2.line(reconstructed, (int(x1), int(y1)), (int(x2), int(y2)), color, 1)
-
-            # Save the final reconstructed image
-            cv2.imwrite("reconstructedFinal.png", reconstructed)
-            print("Reconstructed image saved as reconstructedFinal.png")
-
-        except Exception as e:
-            print(f"Critical Error processing PES files: {e}")
 
 
 class Screen2(QWidget):

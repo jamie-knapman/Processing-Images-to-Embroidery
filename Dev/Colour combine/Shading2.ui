@@ -343,25 +343,6 @@
      <bool>false</bool>
     </property>
    </widget>
-   <widget class="QPushButton" name="finalise">
-    <property name="enabled">
-     <bool>true</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>970</x>
-      <y>560</y>
-      <width>181</width>
-      <height>61</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Finalise</string>
-    </property>
-    <property name="flat">
-     <bool>false</bool>
-    </property>
-   </widget>
    <widget class="QCheckBox" name="light_yellow">
     <property name="enabled">
      <bool>false</bool>
