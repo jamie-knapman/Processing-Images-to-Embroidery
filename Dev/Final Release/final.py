@@ -1,7 +1,6 @@
 import os
 import sys
 
-import networkx as nx
 import pyembroidery as pe
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
@@ -11,32 +10,21 @@ from PyQt6 import uic
 import cv2
 import numpy as np
 import math
-import matplotlib.pyplot as plt
-from skimage.measure import find_contours
-import svgwrite
-from scipy.spatial import KDTree
-from scipy.sparse.csgraph import minimum_spanning_tree
-from scipy.sparse import csr_matrix
-
 
 # Class for the main opening window for the program, the user will be able to make a new design or load an old one here
 class MainWindow(QMainWindow):
     def __init__(self, stacked_widget):
         super().__init__()
         self.stacked_widget = stacked_widget
-        print("Version", cv2.__version__)
 
         # Load .ui file
-        uic.loadUi("MainMenu2.ui", self)
+        uic.loadUi("MainMenuFinal.ui", self)
         self.setFixedSize(1200, 700)
 
         # Buttons for creating new and opening a saved Design
         self.button1 = self.findChild(QPushButton, "createNew")
-        self.button2 = self.findChild(QPushButton, "openSaved")
         # Button actions
         self.button1.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(1))
-        self.button2.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(2))
-
 
 # Class for the upload image window for the program, the user will be able to upload their images here or go back to main
 class Screen1(QMainWindow):
@@ -45,7 +33,7 @@ class Screen1(QMainWindow):
         self.stacked_widget = stacked_widget
 
         # Load the .ui for this window
-        uic.loadUi("CreateNew2.ui", self)
+        uic.loadUi("CreateNewFinal.ui", self)
         self.setFixedSize(1200, 700)
 
         # Define buttons in the window
@@ -53,6 +41,7 @@ class Screen1(QMainWindow):
         self.uploadButton = self.findChild(QPushButton, "UploadImage")
         self.imageLabel = self.findChild(QLabel, "imageLabel")
         self.NextButton = self.findChild(QPushButton, "Next")
+        self.scaleFactor = self.findChild(QPlainTextEdit, "ScaleFactor")
 
         # If X feature exists then allow click condition
         if self.backButton:
@@ -71,12 +60,26 @@ class Screen1(QMainWindow):
     # Upload image function
     def upload_image(self):
         # Open file explorer and let user upload file path
-        file_pathOrg, _ = QFileDialog.getOpenFileName(self, "Open Image", "", "Images (*.png *.jpg *.jpeg *.bmp)")
+        file_pathOrg, _ = QFileDialog.getOpenFileName(self, "Open Image", "", "Images (*.png *.jpg *.jpeg)")
+
 
         try:
             img = cv2.imread(file_pathOrg)
             height, width = img.shape[:2]
-            scale_factor = 1.0
+            # Default to 1.0
+            if not self.scaleFactor:
+                scale_factor = 1.0
+
+            # Get text and assign scale factor, if invalid then default to 1.0
+            text = self.scaleFactor.toPlainText().strip()
+            try:
+                scale_factor =  int(text)
+            except ValueError:
+                try:
+                    scale_factor = float(text)
+                except ValueError:
+                    scale_factor = 1.0
+
             new_width = int(width * scale_factor)
             new_height = int(height * scale_factor)
 
@@ -106,7 +109,7 @@ class Screen3(QMainWindow):
         self.screen1 = screen1
 
         # Load from .ui file
-        uic.loadUi("Edges2.ui", self)
+        uic.loadUi("EdgesFinal.ui", self)
         self.setFixedSize(1200, 700)
 
         # Define UI features
@@ -163,12 +166,12 @@ class Screen3(QMainWindow):
 
             max_stitch_length = 10.0
 
-            # Obtain image through screen1 TODO change this condition
+            # Obtain image through screen1
             image_path = self.screen1.global_image
 
             # Read image into grey scale
             image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-            # Set next button as enabled TODO move just incase errors are made
+            # Set next button as enabled
             self.nextButton.setEnabled(True)
 
             # Canny Edge detection
@@ -184,7 +187,7 @@ class Screen3(QMainWindow):
             edge_image_path = "edges_output.png"
             cv2.imwrite(edge_image_path, contour_image)
 
-            # Embroidery fileName for outlines #TODO change eventually
+            # Embroidery fileName for outlines
             outfile = "emb1"
 
             pattern = self.writeStitches(contours, smallthresh, image, max_stitch_length)
@@ -241,7 +244,7 @@ class Screen3(QMainWindow):
         # Write image
         cv2.imwrite(edge_image_path, self.edges)
 
-        # Load image into frame TODO change this
+        # Load image into frame
         pixmap = QPixmap(edge_image_path)
         if pixmap.isNull():
             print("Error: Failed to load the saved image.")
@@ -273,7 +276,7 @@ class Screen3(QMainWindow):
         self.imageLabel.setScaledContents(True)
 
     def readImg(self, image):
-        # Read image and collect contours TODO add this for vectorise in same funct
+        # Read image and collect contours
         dilated = cv2.dilate(self.edges, (3, 3), iterations=1)
         contours, _ = cv2.findContours(dilated, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -291,6 +294,7 @@ class Screen3(QMainWindow):
 
         # The path of each contour found in the image
         contour_paths = []
+        # Gen Ai used to isolate and subdivide long contours
         for c in contours:
             # Each contour must exceed the threshold
             if len(c) < smallthresh:
@@ -331,8 +335,7 @@ class Screen3(QMainWindow):
 
         while contour_paths:
             # Find the closest contour to the current position
-            next_contour = min(contour_paths,
-                               key=lambda path: np.linalg.norm(np.array(path[0]) - np.array(current_pos)))
+            next_contour = min(contour_paths, key=lambda path: np.linalg.norm(np.array(path[0]) - np.array(current_pos)))
             contour_paths.remove(next_contour)
 
             if ordered_stitches:
@@ -356,6 +359,7 @@ class Screen3(QMainWindow):
         print("TOTAL Stitches:", stitches)
         return p1
 
+    # Gen AI used to subdivie segments
     def subdivide_segment(self, start_pt, end_pt, max_stitch_length):
         (x1, y1) = start_pt
         (x2, y2) = end_pt
@@ -376,7 +380,7 @@ class Screen4(QMainWindow):
         self.screen1 = screen1
 
         # Load UI from .ui file
-        uic.loadUi("Shading2.ui", self)
+        uic.loadUi("ShadingFinal.ui", self)
         self.setFixedSize(1200, 700)
         self.imageLabel = self.findChild(QLabel, "imageLabel")
 
@@ -388,6 +392,9 @@ class Screen4(QMainWindow):
         self.combine = self.findChild(QPushButton, "Combine")
         if self.combine:
             self.combine.clicked.connect(self.combineSelectedColours)
+
+        self.pixelThresh = self.findChild(QPlainTextEdit, "pixelThresh")
+        self.bridge = self.findChild(QPlainTextEdit, "bridge")
 
         # All checkboxes for each colour
         self.red1 = self.findChild(QCheckBox, "red1")
@@ -492,8 +499,9 @@ class Screen4(QMainWindow):
         # Load the image into the BGR space
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
+        # Gen AI - Colour bands generated
         # Define colours
-        color_ranges = {
+        colour_ranges = {
             "red": [(0, 70, 50), (10, 255, 255)],
             "red2": [(160, 70, 50), (180, 255, 255)],
             "orange": [(11, 100, 100), (25, 255, 255)],
@@ -527,14 +535,26 @@ class Screen4(QMainWindow):
         }
 
         # Min pixels needed to segment colours
-        # TODO let user choose this value
-        PIXEL_THRESHOLD = 500
+        # Default to 500
+        if not self.pixelThresh:
+            PIXEL_THRESHOLD = 500
+        # Get text and assign scale factor, if invalid then default to 500
+        text = self.pixelThresh.toPlainText().strip()
+        try:
+            PIXEL_THRESHOLD = int(text)
+        except ValueError:
+            try:
+                PIXEL_THRESHOLD = float(text)
+            except ValueError:
+                PIXEL_THRESHOLD = 500
+
+
 
         # Main segmented colours
         mainColours = []
 
         # Cycle through each main colour
-        for name, (lower, upper) in color_ranges.items():
+        for name, (lower, upper) in colour_ranges.items():
             # Upper and lower colour bands
             lower = np.array(lower, dtype="uint8")
             upper = np.array(upper, dtype="uint8")
@@ -544,7 +564,6 @@ class Screen4(QMainWindow):
             result = cv2.bitwise_and(image, image, mask=mask)
 
             # Create a count for the non black pixels in the segment
-            # TODO account for black pixels in dark images
             non_black_pixels = cv2.countNonZero(mask)
 
             # If the count is creater than the threshhold then same the colour
@@ -559,95 +578,95 @@ class Screen4(QMainWindow):
 
         self.combine.setEnabled(True)
 
-        for color in mainColours:
-            if color == "red":
+        for colour in mainColours:
+            if colour == "red":
                 self.red1.setEnabled(True)
                 self.red1C.setEnabled(True)
-            elif color == "red2":
+            elif colour == "red2":
                 self.red2.setEnabled(True)
                 self.red2C.setEnabled(True)
-            elif color == "orange":
+            elif colour == "orange":
                 self.orange.setEnabled(True)
                 self.orangeC.setEnabled(True)
-            elif color == "yellow":
+            elif colour == "yellow":
                 self.yellow.setEnabled(True)
                 self.yellowC.setEnabled(True)
-            elif color == "light_yellow":
+            elif colour == "light_yellow":
                 self.light_yellow.setEnabled(True)
                 self.light_yellowC.setEnabled(True)
-            elif color == "light_green":
+            elif colour == "light_green":
                 self.lGreen.setEnabled(True)
                 self.lGreenC.setEnabled(True)
-            elif color == "green":
+            elif colour == "green":
                 self.green.setEnabled(True)
                 self.greenC.setEnabled(True)
-            elif color == "dark_green":
+            elif colour == "dark_green":
                 self.dGreen.setEnabled(True)
                 self.dGreenC.setEnabled(True)
-            elif color == "cyan":
+            elif colour == "cyan":
                 self.cyan.setEnabled(True)
                 self.cyanC.setEnabled(True)
-            elif color == "light_cyan":
+            elif colour == "light_cyan":
                 self.light_cyan.setEnabled(True)
                 self.light_cyanC.setEnabled(True)
-            elif color == "teal":
+            elif colour == "teal":
                 self.teal.setEnabled(True)
                 self.tealC.setEnabled(True)
-            elif color == "light_blue":
+            elif colour == "light_blue":
                 self.lBlue.setEnabled(True)
                 self.lBlueC.setEnabled(True)
-            elif color == "blue":
+            elif colour == "blue":
                 self.blue.setEnabled(True)
                 self.blueC.setEnabled(True)
-            elif color == "blue2":
+            elif colour == "blue2":
                 self.blue2.setEnabled(True)
                 self.blue2C.setEnabled(True)
-            elif color == "dark_blue":
+            elif colour == "dark_blue":
                 self.dBlue.setEnabled(True)
                 self.dBlueC.setEnabled(True)
-            elif color == "purple":
+            elif colour == "purple":
                 self.purple.setEnabled(True)
                 self.purpleC.setEnabled(True)
-            elif color == "magenta":
+            elif colour == "magenta":
                 self.magenta.setEnabled(True)
                 self.magentaC.setEnabled(True)
-            elif color == "pink":
+            elif colour == "pink":
                 self.pink.setEnabled(True)
                 self.pinkC.setEnabled(True)
-            elif color == "black":
+            elif colour == "black":
                 self.black.setEnabled(True)
                 self.blackC.setEnabled(True)
-            elif color == "gray":
+            elif colour == "gray":
                 self.gray.setEnabled(True)
                 self.grayC.setEnabled(True)
-            elif color == "white":
+            elif colour == "white":
                 self.white.setEnabled(True)
                 self.whiteC.setEnabled(True)
-            elif color == "brown":
+            elif colour == "brown":
                 self.brown.setEnabled(True)
                 self.brownC.setEnabled(True)
-            elif color == "beige":
+            elif colour == "beige":
                 self.beige.setEnabled(True)
                 self.beigeC.setEnabled(True)
-            elif color == "maroon":
+            elif colour == "maroon":
                 self.maroon.setEnabled(True)
                 self.maroonC.setEnabled(True)
-            elif color == "olive":
+            elif colour == "olive":
                 self.olive.setEnabled(True)
                 self.oliveC.setEnabled(True)
-            elif color == "turquoise":
+            elif colour == "turquoise":
                 self.turquoise.setEnabled(True)
                 self.turquoiseC.setEnabled(True)
-            elif color == "indigo":
+            elif colour == "indigo":
                 self.indigo.setEnabled(True)
                 self.indigoC.setEnabled(True)
-            elif color == "lavender":
+            elif colour == "lavender":
                 self.lavender.setEnabled(True)
                 self.lavenderC.setEnabled(True)
-            elif color == "peach":
+            elif colour == "peach":
                 self.peach.setEnabled(True)
                 self.peachC.setEnabled(True)
-            elif color == "tan":
+            elif colour == "tan":
                 self.tan.setEnabled(True)
                 self.tanC.setEnabled(True)
         print("Checkboxes enabled for:", mainColours)
@@ -661,7 +680,7 @@ class Screen4(QMainWindow):
 
         reconstructed = np.zeros_like(original)
 
-        selected_colors2 = []
+        selected_colours2 = []
 
         checkboxes2 = {
             "red": self.red1C, "red2": self.red2C, "orange": self.orangeC, "yellow": self.yellowC,
@@ -677,10 +696,10 @@ class Screen4(QMainWindow):
 
         for name, checkbox in checkboxes2.items():
             if checkbox.isChecked():
-                selected_colors2.append(name)
-        print("Combining", selected_colors2)
+                selected_colours2.append(name)
+        print("Combining", selected_colours2)
 
-        for name in selected_colors2:
+        for name in selected_colours2:
             if name in self.segmented_images:
                 seg_img = self.segmented_images[name]
 
@@ -737,7 +756,7 @@ class Screen4(QMainWindow):
 
         reconstructed = np.zeros_like(original)
 
-        selected_colors = []
+        selected_colours = []
 
         checkboxes = {
             "red": self.red1, "red2": self.red2, "orange": self.orange, "yellow": self.yellow,
@@ -754,11 +773,11 @@ class Screen4(QMainWindow):
 
         for name, checkbox in checkboxes.items():
             if checkbox.isChecked():
-                selected_colors.append(name)
+                selected_colours.append(name)
 
-        print("Reconstructing with:", selected_colors)
+        print("Reconstructing with:", selected_colours)
 
-        for name in selected_colors:
+        for name in selected_colours:
             if name in self.segmented_images:
                 seg_img = self.segmented_images[name]
 
@@ -784,7 +803,7 @@ class Screen4(QMainWindow):
             print("Error: Unable to read the original image.")
             return
 
-        selected_colors = []
+        selected_colours = []
 
         checkboxes = {
             "red": self.red1, "red2": self.red2, "orange": self.orange, "yellow": self.yellow,
@@ -801,11 +820,14 @@ class Screen4(QMainWindow):
 
         for name, checkbox in checkboxes.items():
             if checkbox.isChecked():
-                selected_colors.append(name)
+                selected_colours.append(name)
 
-        self.colourBridge = selected_colors
+        self.colourBridge = selected_colours
 
-        for name in selected_colors:
+
+
+
+        for name in selected_colours:
             img_file = f"{name}.png"
             print(img_file)
             if not os.path.exists(img_file):
@@ -813,7 +835,20 @@ class Screen4(QMainWindow):
                 continue
 
             try:
-                pattern = self.image_to_stitch_pattern(img_file, 6, 5, 3)
+                # Bridge spacing
+                # Default to 5
+                if not self.bridge:
+                    bridge = 5
+                # Get text and assign scale factor, if invalid then default to 5
+                text = self.bridge.toPlainText().strip()
+                try:
+                    bridge = int(text)
+                except ValueError:
+                    try:
+                        bridge = float(text)
+                    except ValueError:
+                        bridge = 5
+                pattern = self.image_to_stitch_pattern(img_file, bridge, 5, 3)
                 if pattern is None:
                     print(f"Warning: No valid pattern for {img_file}. Skipping.")
                     continue
@@ -839,8 +874,7 @@ class Screen4(QMainWindow):
         while unvisited:
             current = path[-1]
             # Find the nearest unvisited point
-            nearest = min(unvisited,
-                          key=lambda i: np.linalg.norm(np.array(stitch_points[current]) - np.array(stitch_points[i])))
+            nearest = min(unvisited, key=lambda i: np.linalg.norm(np.array(stitch_points[current]) - np.array(stitch_points[i])))
 
             path.append(nearest)
             unvisited.remove(nearest)
@@ -851,6 +885,7 @@ class Screen4(QMainWindow):
 
     def image_to_stitch_pattern(self, image_path, bridge_spacing, max_stitch_length, kernel_size):
         # Function to subdivide long stitch segments
+        # Gen AI used for subdiving segments
         def subdivide_segment(start_pt, end_pt, max_stitch_length):
             (x1, y1) = start_pt
             (x2, y2) = end_pt
